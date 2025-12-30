@@ -89,3 +89,47 @@ def add_gasto(
         s.add(m)
         s.commit()
     print("[green]\u2713 Gasto guardado[/green]")
+
+
+@app.command("facturas")
+def list_facturas(
+    limit: int = typer.Option(200, help="Máximo de facturas a mostrar"),
+    desc: bool = typer.Option(False, help="Orden descendente"),
+):
+    """Lista facturas emitidas."""
+    from sqlmodel import select
+
+    stmt = select(FacturaEmitida)
+    stmt = stmt.order_by(
+        FacturaEmitida.fecha_emision.desc() if desc else FacturaEmitida.fecha_emision,
+        FacturaEmitida.numero.desc() if desc else FacturaEmitida.numero,
+    )
+    if limit is not None and limit > 0:
+        stmt = stmt.limit(limit)
+
+    with get_session() as s:
+        facturas = list(s.exec(stmt).all())
+
+    t = Table(title="Facturas emitidas")
+    t.add_column("ID", justify="right")
+    t.add_column("Número")
+    t.add_column("Fecha")
+    t.add_column("Cliente")
+    t.add_column("Base (EUR)", justify="right")
+    t.add_column("IVA (EUR)", justify="right")
+    t.add_column("IRPF (EUR)", justify="right")
+    t.add_column("Actividad")
+
+    for f in facturas:
+        t.add_row(
+            str(f.id or ""),
+            f.numero,
+            f.fecha_emision.isoformat(),
+            f.cliente_nombre,
+            str(f.base_eur),
+            str(f.cuota_iva),
+            str(f.ret_irpf_importe),
+            str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
+        )
+
+    print(t)
