@@ -1,0 +1,15 @@
+# Entorno
+.venv/
+__pycache__/
+*.pyc
+
+# Datos sensibles
+conta.db
+.env
+
+# Salidas
+reports/*
+!reports/.gitkeep
+
+# PDFs
+*.pdf
