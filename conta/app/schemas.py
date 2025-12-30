@@ -19,7 +19,7 @@ class FacturaIn(BaseModel):
 
 
 class GastoIn(BaseModel):
-    proveedor_nombre: str
+    proveedor: str
     proveedor_nif: str | None = None
     fecha: date
     base_eur: Decimal
