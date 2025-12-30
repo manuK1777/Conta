@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+conta/app/__init__.py
+conta/app/cli.py
+conta/app/db.py
+conta/app/models.py
+conta/app/schemas.py
+conta/app/services/__init__.py
+conta/app/services/irpf.py
+conta/app/services/iva.py
+conta/app/services/libros.py
+conta_mvp.egg-info/PKG-INFO
+conta_mvp.egg-info/SOURCES.txt
+conta_mvp.egg-info/dependency_links.txt
+conta_mvp.egg-info/entry_points.txt
+conta_mvp.egg-info/requires.txt
+conta_mvp.egg-info/top_level.txt

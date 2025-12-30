@@ -25,9 +25,9 @@ def add_factura(
 numero: str,
 fecha: str,
 cliente_nombre: str,
-base: Decimal,
-tipo_iva: Decimal = Decimal("21.00"),
-ret_irpf_pct: Decimal = Decimal("0.00"),
+base: str,
+tipo_iva: str = "21.00",
+ret_irpf_pct: str = "0.00",
 actividad: Actividad = Actividad.programacion,
 cliente_nif: str = typer.Option(None),
 pais: str = typer.Option(None),
@@ -41,9 +41,9 @@ pdf: str = typer.Option(None, help="Ruta del PDF")
         cliente_nombre=cliente_nombre,
         cliente_nif=cliente_nif,
         pais=pais,
-        base_eur=base,
-        tipo_iva=tipo_iva,
-        ret_irpf_pct=ret_irpf_pct,
+        base_eur=Decimal(base),
+        tipo_iva=Decimal(tipo_iva),
+        ret_irpf_pct=Decimal(ret_irpf_pct),
         actividad=actividad,
         notas=notas,
         archivo_pdf_path=pdf,
@@ -66,10 +66,26 @@ pdf: str = typer.Option(None, help="Ruta del PDF")
 def add_gasto(
     proveedor: str,
     fecha: str,
-    base: Decimal,
-    tipo_iva: Decimal = Decimal("21.00"),
-    afecto_pct: Decimal = Decimal("100.00"),
+    base: str,
+    tipo_iva: str = "21.00",
+    afecto_pct: str = "100.00",
     tipo: str = typer.Option(None),
     pdf: str = typer.Option(None, help="Ruta del PDF")
 ):
     """Añade un gasto deducible."""
+    g = GastoIn(
+        proveedor_nombre=proveedor,
+        fecha=date.fromisoformat(fecha),
+        base_eur=Decimal(base),
+        tipo_iva=Decimal(tipo_iva),
+        afecto_pct=Decimal(afecto_pct),
+        tipo=tipo,
+        archivo_pdf_path=pdf,
+    )
+
+    cuota_iva = (g.base_eur * g.tipo_iva / 100).quantize(Decimal("0.01"))
+    m = GastoDeducible(**g.model_dump(), cuota_iva=cuota_iva)
+    with get_session() as s:
+        s.add(m)
+        s.commit()
+    print("[green]\u2713 Gasto guardado[/green]")

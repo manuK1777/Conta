@@ -1,0 +1,30 @@
+Metadata-Version: 2.4
+Name: conta-mvp
+Version: 0.1.0
+Summary: Contabilidad personal para autónomos (CLI + SQLite)
+Author: MK
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: sqlmodel>=0.0.16
+Requires-Dist: pydantic>=2.7
+Requires-Dist: typer[all]>=0.12
+Requires-Dist: rich>=13.7
+Requires-Dist: fastapi>=0.112
+Requires-Dist: uvicorn>=0.30
+Requires-Dist: pandas>=2.2
+Requires-Dist: python-dotenv>=1.0
+
+# Conta MVP
+
+## Requisitos
+- Python 3.10+
+- make, tar
+
+## Instalación
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e .
+cp .env.example .env
+conta init
