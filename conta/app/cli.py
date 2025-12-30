@@ -7,8 +7,9 @@ from .db import init_db, get_session
 from .models import FacturaEmitida, GastoDeducible, Actividad
 from .schemas import FacturaIn, GastoIn
 from .services.iva import iva_trimestre
-from .services.irpf import irpf_trimestre
+from .services.irpf import irpf_modelo130
 from .services.libros import export_libros
+
 
 
 app = typer.Typer(help="CLI de contabilidad personal para autónomos")
@@ -241,3 +242,106 @@ def calcular_iva(
         print("[yellow]Resultado: IVA a compensar o devolver[/yellow]")
     else:
         print("[blue]Resultado: IVA neutro[/blue]")
+
+@app.command("m130")
+def calcular_m130(
+    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q3"),
+    solo_programacion: bool = typer.Option(
+        False,
+        "--solo-programacion",
+        help="Modo análisis: solo actividad programación (NO oficial)",
+    ),
+):
+    """
+    Modelo 130 – Pago fraccionado IRPF (reproducción oficial, apartado I).
+
+    Por defecto reproduce EXACTAMENTE el modelo presentado a la AEAT.
+    Con --solo-programacion calcula solo la actividad sin retención (análisis).
+    """
+    from decimal import Decimal as _Decimal
+
+    # ─────────────────────────────────────────────
+    # Validación periodo
+    # ─────────────────────────────────────────────
+    try:
+        year = int(periodo[:4])
+        q = int(periodo[-1])
+        if q not in (1, 2, 3, 4):
+            raise ValueError
+    except ValueError:
+        typer.secho(
+            "Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    # ─────────────────────────────────────────────
+    # Cálculo fiscal (SERVICIO)
+    # ─────────────────────────────────────────────
+    r = irpf_modelo130(year, q, solo_programacion=solo_programacion)
+
+    def eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    # ─────────────────────────────────────────────
+    # Tabla principal – Casillas modelo 130
+    # ─────────────────────────────────────────────
+    title = f"Modelo 130 – IRPF ({periodo})"
+    if solo_programacion:
+        title += " [ANÁLISIS SOLO PROGRAMACIÓN]"
+
+    t = Table(title=title)
+    t.add_column("Casilla", justify="right")
+    t.add_column("Concepto")
+    t.add_column("Importe (€)", justify="right")
+
+    t.add_row("01", "Ingresos computables", eur(r["ingresos"]))
+    t.add_row(
+        "02",
+        "Gastos deducibles + Cuotas SS",
+        f"-{eur(r['gastos'])}",
+    )
+    t.add_row("03", "Rendimiento neto", eur(r["rendimiento"]))
+    t.add_row("04", "20 % del rendimiento", eur(r["base_20"]))
+    t.add_row(
+        "06",
+        "Retenciones soportadas",
+        f"-{eur(r['retenciones'])}",
+    )
+    t.add_row(
+        "07",
+        "[bold]Resultado pago fraccionado[/bold]",
+        f"[bold]{eur(r['resultado'])}[/bold]",
+    )
+
+    print(t)
+
+    # ─────────────────────────────────────────────
+    # Tabla detalle (informativa, no oficial)
+    # ─────────────────────────────────────────────
+    d = r.get("detalle", {})
+    if d:
+        td = Table(title="Detalle informativo")
+        td.add_column("Concepto")
+        td.add_column("Importe (€)", justify="right")
+
+        td.add_row("Gastos deducibles (sin cuotas SS)", eur(d["gastos_sin_cuotas"]))
+        td.add_row("Cuotas de autónomos (SS)", eur(d["cuotas_ss"]))
+
+        print(td)
+
+    # ─────────────────────────────────────────────
+    # Mensaje final
+    # ─────────────────────────────────────────────
+    if solo_programacion:
+        print(
+            "[yellow]⚠️  Modo análisis: este resultado NO es el modelo oficial presentado a la AEAT.[/yellow]"
+        )
+    else:
+        if r["resultado"] > 0:
+            print("[green]Resultado: importe a ingresar[/green]")
+        elif r["resultado"] < 0:
+            print("[yellow]Resultado: negativo (a compensar)[/yellow]")
+        else:
+            print("[blue]Resultado: 0[/blue]")
+
