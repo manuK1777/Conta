@@ -1,0 +1,18 @@
+iva_tipos:
+general: 21.0
+reducido: 10.0
+superreducido: 4.0
+
+
+irpf_retenciones_por_actividad:
+musica: 15.0 
+programacion: 0.0
+
+
+modelo130:
+porcentaje_pago_fraccionado: 20.0 # % sobre rendimiento neto si procede
+
+
+redondeo:
+decimales_visualizacion: 2
+decimales_calculo: 4

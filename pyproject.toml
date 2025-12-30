@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "conta-mvp"
+version = "0.1.0"
+description = "Contabilidad personal para autónomos (CLI + SQLite)"
+readme = "README.md"
+authors = [{ name = "MK" }]
+requires-python = ">=3.10"
+dependencies = [
+"sqlmodel>=0.0.16",
+"pydantic>=2.7",
+"typer[all]>=0.12",
+"rich>=13.7",
+"fastapi>=0.112",
+"uvicorn>=0.30",
+"pandas>=2.2",
+"python-dotenv>=1.0",
+]
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+
+[tool.setuptools.package-data]
+"conta.app" = ["../config/rules.yml"]
+
+
+[project.scripts]
+conta = "conta.app.cli:app"
