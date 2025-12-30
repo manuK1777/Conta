@@ -98,6 +98,7 @@ def list_facturas(
 ):
     """Lista facturas emitidas."""
     from sqlmodel import select
+    from decimal import Decimal as _Decimal
 
     stmt = select(FacturaEmitida)
     stmt = stmt.order_by(
@@ -120,15 +121,18 @@ def list_facturas(
     t.add_column("IRPF (EUR)", justify="right")
     t.add_column("Actividad")
 
+    def _fmt_eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
     for f in facturas:
         t.add_row(
             str(f.id or ""),
             f.numero,
             f.fecha_emision.isoformat(),
             f.cliente_nombre,
-            str(f.base_eur),
-            str(f.cuota_iva),
-            str(f.ret_irpf_importe),
+            _fmt_eur(f.base_eur),
+            _fmt_eur(f.cuota_iva),
+            _fmt_eur(f.ret_irpf_importe),
             str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
         )
 
