@@ -196,3 +196,48 @@ def list_gastos(
         )
 
     print(t)
+
+@app.command("iva")
+def calcular_iva(
+    periodo: str = typer.Argument(..., help="Periodo en formato YYYYQ#, ej: 2025Q3")
+):
+    """
+    Calcula y muestra el IVA a pagar de un trimestre (modelo 303).
+    """
+    from decimal import Decimal as _Decimal
+
+    # Parse periodo
+    try:
+        year = int(periodo[:4])
+        q = int(periodo[-1])
+        if q not in (1, 2, 3, 4):
+            raise ValueError
+    except ValueError:
+        typer.secho("Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    res = iva_trimestre(year, q)
+
+    def _fmt_eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    t = Table(title=f"IVA – Modelo 303 ({periodo})")
+    t.add_column("Concepto")
+    t.add_column("Importe (EUR)", justify="right")
+
+    t.add_row("IVA devengado (ventas)", _fmt_eur(res["iva_devengado"]))
+    t.add_row("IVA deducible (compras)", _fmt_eur(res["iva_deducible"]))
+    t.add_row("", "")
+    t.add_row(
+        "[bold]Resultado[/bold]",
+        f"[bold]{_fmt_eur(res['resultado'])}[/bold]",
+    )
+
+    print(t)
+
+    if res["resultado"] > 0:
+        print("[green]Resultado: IVA a ingresar[/green]")
+    elif res["resultado"] < 0:
+        print("[yellow]Resultado: IVA a compensar o devolver[/yellow]")
+    else:
+        print("[blue]Resultado: IVA neutro[/blue]")
