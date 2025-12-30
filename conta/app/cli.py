@@ -147,3 +147,52 @@ def list_facturas(
         )
 
     print(t)
+
+
+@app.command("gastos")
+def list_gastos(
+    limit: int = typer.Option(200, help="Máximo de gastos a mostrar"),
+    desc: bool = typer.Option(False, help="Orden descendente"),
+):
+    """Lista gastos deducibles."""
+    from sqlmodel import select
+    from decimal import Decimal as _Decimal
+
+    stmt = select(GastoDeducible)
+    stmt = stmt.order_by(
+        GastoDeducible.fecha.desc() if desc else GastoDeducible.fecha,
+        (GastoDeducible.proveedor.desc() if desc else GastoDeducible.proveedor),
+    )
+    if limit is not None and limit > 0:
+        stmt = stmt.limit(limit)
+
+    with get_session() as s:
+        gastos = list(s.exec(stmt).all())
+
+    t = Table(title="Gastos deducibles")
+    t.add_column("ID", justify="right")
+    t.add_column("Proveedor")
+    t.add_column("Fecha")
+    t.add_column("Tipo")
+    t.add_column("Afecto (%)", justify="right")
+    t.add_column("Base (EUR)", justify="right")
+    t.add_column("IVA (EUR)", justify="right")
+
+    def _fmt_eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    def _fmt_pct(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    for g in gastos:
+        t.add_row(
+            str(g.id or ""),
+            g.proveedor,
+            g.fecha.isoformat(),
+            str(g.tipo or ""),
+            _fmt_pct(g.afecto_pct),
+            _fmt_eur(g.base_eur),
+            _fmt_eur(g.cuota_iva),
+        )
+
+    print(t)
