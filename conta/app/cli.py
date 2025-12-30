@@ -74,7 +74,7 @@ def add_gasto(
 ):
     """Añade un gasto deducible."""
     g = GastoIn(
-        proveedor_nombre=proveedor,
+        proveedor=proveedor,
         fecha=date.fromisoformat(fecha),
         base_eur=Decimal(base),
         tipo_iva=Decimal(tipo_iva),
@@ -84,7 +84,17 @@ def add_gasto(
     )
 
     cuota_iva = (g.base_eur * g.tipo_iva / 100).quantize(Decimal("0.01"))
-    m = GastoDeducible(**g.model_dump(), cuota_iva=cuota_iva)
+    m = GastoDeducible(
+        proveedor=g.proveedor,
+        proveedor_nif=g.proveedor_nif,
+        fecha=g.fecha,
+        base_eur=g.base_eur,
+        tipo_iva=g.tipo_iva,
+        cuota_iva=cuota_iva,
+        tipo=g.tipo,
+        afecto_pct=g.afecto_pct,
+        archivo_pdf_path=g.archivo_pdf_path,
+    )
     with get_session() as s:
         s.add(m)
         s.commit()

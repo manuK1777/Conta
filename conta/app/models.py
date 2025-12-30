@@ -30,7 +30,7 @@ class FacturaEmitida(SQLModel, table=True):
 
 class GastoDeducible(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    proveedor_nombre: str
+    proveedor: str
     proveedor_nif: str | None = None
     fecha: date
     base_eur: Decimal
