@@ -140,11 +140,14 @@ def list_facturas(
         q = ((d.month - 1) // 3) + 1
         return f"{d.year}Q{q}"
 
+    def _fmt_fecha(d: date) -> str:
+        return d.strftime("%d-%m-%Y")
+
     for f in facturas:
         t.add_row(
             str(f.id or ""),
             f.numero,
-            f.fecha_emision.isoformat(),
+            _fmt_fecha(f.fecha_emision),
             _fmt_quarter(f.fecha_emision),
             f.cliente_nombre,
             _fmt_eur(f.base_eur),
@@ -196,11 +199,14 @@ def list_gastos(
         q = ((d.month - 1) // 3) + 1
         return f"{d.year}Q{q}"
 
+    def _fmt_fecha(d: date) -> str:
+        return d.strftime("%d-%m-%Y")
+
     for g in gastos:
         t.add_row(
             str(g.id or ""),
             g.proveedor,
-            g.fecha.isoformat(),
+            _fmt_fecha(g.fecha),
             _fmt_quarter(g.fecha),
             str(g.tipo or ""),
             _fmt_pct(g.afecto_pct),
@@ -254,6 +260,34 @@ def calcular_iva(
         print("[yellow]Resultado: IVA a compensar o devolver[/yellow]")
     else:
         print("[blue]Resultado: IVA neutro[/blue]")
+
+
+@app.command("irpf")
+def ver_irpf(
+    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q3"),
+):
+    """Muestra retenciones soportadas (IRPF) de un trimestre."""
+    from decimal import Decimal as _Decimal
+
+    try:
+        year = int(periodo[:4])
+        q = int(periodo[-1])
+        if q not in (1, 2, 3, 4):
+            raise ValueError
+    except ValueError:
+        typer.secho("Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    r = irpf_modelo130(year, q)
+
+    def eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    t = Table(title=f"IRPF – Retenciones soportadas ({periodo})")
+    t.add_column("Concepto")
+    t.add_column("Importe (EUR)", justify="right")
+    t.add_row("Retenciones soportadas", eur(r["retenciones"]))
+    print(t)
 
 @app.command("m130")
 def calcular_m130(
