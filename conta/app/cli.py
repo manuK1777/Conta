@@ -126,6 +126,7 @@ def list_facturas(
     t.add_column("ID", justify="right")
     t.add_column("Número")
     t.add_column("Fecha")
+    t.add_column("Trimestre")
     t.add_column("Cliente")
     t.add_column("Base (EUR)", justify="right")
     t.add_column("IVA (EUR)", justify="right")
@@ -135,11 +136,16 @@ def list_facturas(
     def _fmt_eur(v: _Decimal) -> str:
         return format(v.quantize(_Decimal("0.01")), "f")
 
+    def _fmt_quarter(d: date) -> str:
+        q = ((d.month - 1) // 3) + 1
+        return f"{d.year}Q{q}"
+
     for f in facturas:
         t.add_row(
             str(f.id or ""),
             f.numero,
             f.fecha_emision.isoformat(),
+            _fmt_quarter(f.fecha_emision),
             f.cliente_nombre,
             _fmt_eur(f.base_eur),
             _fmt_eur(f.cuota_iva),
@@ -174,6 +180,7 @@ def list_gastos(
     t.add_column("ID", justify="right")
     t.add_column("Proveedor")
     t.add_column("Fecha")
+    t.add_column("Trimestre")
     t.add_column("Tipo")
     t.add_column("Afecto (%)", justify="right")
     t.add_column("Base (EUR)", justify="right")
@@ -185,11 +192,16 @@ def list_gastos(
     def _fmt_pct(v: _Decimal) -> str:
         return format(v.quantize(_Decimal("0.01")), "f")
 
+    def _fmt_quarter(d: date) -> str:
+        q = ((d.month - 1) // 3) + 1
+        return f"{d.year}Q{q}"
+
     for g in gastos:
         t.add_row(
             str(g.id or ""),
             g.proveedor,
             g.fecha.isoformat(),
+            _fmt_quarter(g.fecha),
             str(g.tipo or ""),
             _fmt_pct(g.afecto_pct),
             _fmt_eur(g.base_eur),
