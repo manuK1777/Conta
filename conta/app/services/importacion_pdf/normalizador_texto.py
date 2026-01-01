@@ -1,0 +1,27 @@
+import re
+from decimal import Decimal
+from datetime import date
+
+def normalizar_decimal(txt: str) -> Decimal:
+    """
+    Convierte '3.680,00' → Decimal('3680.00')
+    """
+    return Decimal(txt.replace(".", "").replace(",", "."))
+
+
+def extraer_fecha_espanola(txt: str) -> date:
+    """
+    Convierte '29 de noviembre 2025' → date(2025, 11, 29)
+    """
+    meses = {
+        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
+        "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+        "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
+    }
+
+    m = re.search(r"(\d{1,2})\s+de\s+(\w+)\s+(\d{4})", txt.lower())
+    if not m:
+        raise ValueError(f"No se pudo interpretar la fecha: {txt}")
+
+    dia, mes_txt, anio = m.groups()
+    return date(int(anio), meses[mes_txt], int(dia))
