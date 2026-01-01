@@ -2,10 +2,10 @@ import typer
 from rich import print
 from rich.table import Table
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 from .db import init_db, get_session
-from .models import FacturaEmitida, GastoDeducible, Actividad
-from .schemas import FacturaIn, GastoIn
+from .models import FacturaEmitida, GastoDeducible, Actividad, PagoAutonomo
+from .schemas import FacturaIn, GastoIn, CuotaAutonomoIn
 from .services.iva import iva_trimestre
 from .services.irpf import irpf_modelo130
 from .services.libros import export_libros
@@ -157,6 +157,62 @@ def list_facturas(
         )
 
     print(t)
+
+
+@app.command("cuota")
+def add_cuota(
+    fecha: str,
+    importe: str,
+    concepto: str = typer.Option(None),
+):
+    """Añade una cuota de autónomos."""
+
+    def _parse_fecha(v: str) -> date:
+        try:
+            return date.fromisoformat(v)
+        except ValueError:
+            return datetime.strptime(v, "%d-%m-%Y").date()
+
+    try:
+        fecha_dt = _parse_fecha(fecha)
+    except Exception:
+        typer.secho(
+            "Fecha inválida. Usa YYYY-MM-DD o DD-MM-YYYY",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    def _parse_importe(v: str) -> Decimal:
+        # Permite formato ES con coma decimal (p.ej. 529,32)
+        normalized = v.strip().replace(" ", "").replace(",", ".")
+        return Decimal(normalized)
+
+    try:
+        importe_dec = _parse_importe(importe)
+    except Exception:
+        typer.secho(
+            "Importe inválido. Usa formato 123.45 (o 123,45)",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    c = CuotaAutonomoIn(
+        fecha=fecha_dt,
+        importe_eur=importe_dec,
+        concepto=concepto,
+    )
+
+    m = PagoAutonomo(
+        fecha=c.fecha,
+        importe_eur=c.importe_eur,
+        concepto=c.concepto,
+    )
+
+    with get_session() as s:
+        s.add(m)
+        s.commit()
+
+    print("[green]\u2713 Cuota guardada[/green]")
 
 
 @app.command("gastos")
@@ -391,3 +447,37 @@ def calcular_m130(
         else:
             print("[blue]Resultado: 0[/blue]")
 
+
+@app.command("cuotas")
+def list_cuotas():
+    """Lista cuotas de autónomos."""
+    from sqlmodel import select
+    from rich.table import Table
+    from decimal import Decimal as _Decimal
+
+    with get_session() as s:
+        cuotas = s.exec(select(PagoAutonomo).order_by(PagoAutonomo.fecha)).all()
+
+    t = Table(title="Cuotas de autónomos")
+    t.add_column("Fecha")
+    t.add_column("Importe (€)", justify="right")
+    t.add_column("Concepto")
+
+    def eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    def fmt_fecha(d: date) -> str:
+        return d.strftime("%d-%m-%Y")
+
+    for c in cuotas:
+        t.add_row(
+            fmt_fecha(c.fecha),
+            eur(c.importe_eur),
+            c.concepto or "",
+        )
+
+    total = sum((c.importe_eur for c in cuotas), _Decimal("0.00"))
+    t.add_row("", "", "")
+    t.add_row("[bold]TOTAL[/bold]", f"[bold]{eur(total)}[/bold]", "")
+
+    print(t)

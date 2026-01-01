@@ -14,7 +14,7 @@ class Actividad(str, Enum):
 class FacturaEmitida(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     numero: str = Field(index=True, unique=True)
-    fecha_emision: date
+    fecha_emision: date = Field(index=True)
     cliente_nombre: str
     cliente_nif: str | None = None
     pais: str | None = None
@@ -32,7 +32,7 @@ class GastoDeducible(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     proveedor: str
     proveedor_nif: str | None = None
-    fecha: date
+    fecha: date = Field(index=True)
     base_eur: Decimal
     tipo_iva: Decimal = Decimal("21.00")
     cuota_iva: Decimal = Decimal("0.00")
@@ -43,6 +43,6 @@ class GastoDeducible(SQLModel, table=True):
 
 class PagoAutonomo(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    fecha: date
+    fecha: date = Field(index=True)
     importe_eur: Decimal
     concepto: str | None = None

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator   
 from datetime import date
 from decimal import Decimal
 from .models import Actividad
@@ -27,3 +27,15 @@ class GastoIn(BaseModel):
     afecto_pct: Decimal = Field(default=Decimal("100.00"))
     tipo: str | None = None
     archivo_pdf_path: str | None = None
+
+class CuotaAutonomoIn(BaseModel):
+    fecha: date
+    importe_eur: Decimal
+    concepto: str | None = None
+
+    @field_validator("importe_eur")
+    @classmethod
+    def importe_positive(cls, v: Decimal):
+        if v <= 0:
+            raise ValueError("La cuota de autónomos debe ser mayor que 0")
+        return v.quantize(Decimal("0.01"))    
