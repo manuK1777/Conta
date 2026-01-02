@@ -6,9 +6,11 @@ from datetime import date, datetime
 from .db import init_db, get_session
 from .models import FacturaEmitida, GastoDeducible, Actividad, PagoAutonomo
 from .schemas import FacturaIn, GastoIn, CuotaAutonomoIn
+from sqlmodel import select
 from .services.iva import iva_trimestre
 from .services.irpf import irpf_modelo130
 from .services.libros import export_libros
+from .services.importacion_pdf.importador_factura import importar_factura_pdf
 
 
 
@@ -481,3 +483,85 @@ def list_cuotas():
     t.add_row("[bold]TOTAL[/bold]", f"[bold]{eur(total)}[/bold]", "")
 
     print(t)
+
+@app.command("import-facturas")
+def import_facturas(
+    carpeta: str = typer.Argument(..., help="Carpeta con facturas en PDF"),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Solo muestra lo que se importaría, no guarda nada",
+    ),
+):
+    """
+    Importa facturas emitidas desde PDFs.
+    Compatible con IVA / sin IVA / IRPF.
+    """
+    import os
+
+    if not os.path.isdir(carpeta):
+        typer.secho("La ruta indicada no es una carpeta", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    pdfs = [f for f in os.listdir(carpeta) if f.lower().endswith(".pdf")]
+
+    if not pdfs:
+        typer.secho("No se encontraron PDFs en la carpeta", fg=typer.colors.YELLOW)
+        return
+
+    print(f"📂 Procesando {len(pdfs)} archivos PDF\n")
+
+    for nombre in sorted(pdfs):
+        ruta = os.path.join(carpeta, nombre)
+
+        try:
+            factura_in = importar_factura_pdf(ruta)
+
+            # Cálculos fiscales
+            cuota_iva = (
+                factura_in.base_eur * factura_in.tipo_iva / Decimal("100")
+            ).quantize(Decimal("0.01"))
+
+            ret_irpf = (
+                factura_in.base_eur * factura_in.ret_irpf_pct / Decimal("100")
+            ).quantize(Decimal("0.01"))
+
+            factura_db = FacturaEmitida(
+                **factura_in.model_dump(),
+                cuota_iva=cuota_iva,
+                ret_irpf_importe=ret_irpf,
+            )
+
+            with get_session() as s:
+                existente = s.exec(
+                    select(FacturaEmitida).where(
+                        FacturaEmitida.numero == factura_db.numero
+                    )
+                ).first()
+
+                if existente:
+                    print(
+                        f"[yellow]↷ Factura {factura_db.numero} ya existe, se omite[/yellow]"
+                    )
+                    continue
+
+                if dry_run:
+                    print(
+                        f"[blue]→ {factura_db.numero} | "
+                        f"{factura_db.fecha_emision} | "
+                        f"{factura_db.base_eur} € | "
+                        f"IVA {factura_db.tipo_iva}% | "
+                        f"IRPF {factura_db.ret_irpf_pct}%[/blue]"
+                    )
+                else:
+                    s.add(factura_db)
+                    s.commit()
+                    print(
+                        f"[green]✓ Importada factura {factura_db.numero}[/green]"
+                    )
+
+        except Exception as e:
+            print(f"[red]✗ Error en {nombre}: {e}[/red]")
+
+    if dry_run:
+        print("\n[yellow]Modo dry-run: no se ha guardado ninguna factura[/yellow]")
