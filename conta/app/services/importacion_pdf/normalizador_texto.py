@@ -20,6 +20,7 @@ def extraer_fecha_espanola(txt: str) -> date:
     """
     Convierte '29 de noviembre 2025' → date(2025, 11, 29)
     """
+    txt = txt.replace("’", "'").replace("‘", "'")
     meses = {
         # ES
         "enero": 1,
@@ -53,7 +54,7 @@ def extraer_fecha_espanola(txt: str) -> date:
     }
 
     m = re.search(
-        r"(\d{1,2})\s+(?:de|d')\s*(\w+)(?:\s+de)?\s+(\d{4})",
+        r"(\d{1,2})\s+(?:de|d['’])\s*(\w+)(?:\s+de)?\s+(\d{4})",
         txt.lower(),
     )
     if not m:
