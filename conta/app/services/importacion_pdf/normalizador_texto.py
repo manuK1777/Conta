@@ -45,7 +45,7 @@ def extraer_fecha_espanola(txt: str) -> date:
         "desembre": 12,
     }
 
-    m = re.search(r"(\d{1,2})\s+de\s+(\w+)\s+(\d{4})", txt.lower())
+    m = re.search(r"(\d{1,2})\s+de\s+(\w+)(?:\s+de)?\s+(\d{4})", txt.lower())
     if not m:
         raise ValueError(f"No se pudo interpretar la fecha: {txt}")
 
