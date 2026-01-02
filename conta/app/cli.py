@@ -526,6 +526,8 @@ def import_facturas(
                 factura_in.base_eur * factura_in.ret_irpf_pct / Decimal("100")
             ).quantize(Decimal("0.01"))
 
+            total = (factura_in.base_eur + cuota_iva - ret_irpf).quantize(Decimal("0.01"))
+
             factura_db = FacturaEmitida(
                 **factura_in.model_dump(),
                 cuota_iva=cuota_iva,
@@ -551,7 +553,8 @@ def import_facturas(
                         f"{factura_db.fecha_emision} | "
                         f"{factura_db.base_eur} € | "
                         f"IVA {factura_db.tipo_iva}% | "
-                        f"IRPF {factura_db.ret_irpf_pct}%[/blue]"
+                        f"IRPF {factura_db.ret_irpf_pct}% | "
+                        f"TOTAL {total} €[/blue]"
                     )
                 else:
                     s.add(factura_db)
