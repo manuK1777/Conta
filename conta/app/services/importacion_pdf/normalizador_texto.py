@@ -6,7 +6,14 @@ def normalizar_decimal(txt: str) -> Decimal:
     """
     Convierte '3.680,00' → Decimal('3680.00')
     """
-    return Decimal(txt.replace(".", "").replace(",", "."))
+    s = txt.strip()
+    s = s.replace("€", "").replace("EUR", "")
+    s = s.replace(" ", "")
+    # soporta formatos como (52,50) para negativos
+    if s.startswith("(") and s.endswith(")"):
+        s = "-" + s[1:-1]
+    s = s.replace(".", "").replace(",", ".")
+    return Decimal(s)
 
 
 def extraer_fecha_espanola(txt: str) -> date:

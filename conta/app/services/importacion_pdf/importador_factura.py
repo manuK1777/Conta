@@ -7,7 +7,7 @@ from ...schemas import FacturaIn
 from ...models import Actividad
 
 
-def importar_factura_pdf(ruta_pdf: str) -> FacturaIn:
+def importar_factura_pdf(ruta_pdf: str) -> tuple[FacturaIn, dict]:
     texto = extraer_texto_pdf(ruta_pdf)
 
     campos = extraer_campos_comunes(texto)
@@ -20,7 +20,7 @@ def importar_factura_pdf(ruta_pdf: str) -> FacturaIn:
         else Actividad.musica
     )
 
-    return FacturaIn(
+    factura = FacturaIn(
         numero=campos["numero"],
         fecha_emision=extraer_fecha_espanola(campos["fecha_raw"]),
         cliente_nombre=campos["cliente_nombre"],
@@ -32,3 +32,5 @@ def importar_factura_pdf(ruta_pdf: str) -> FacturaIn:
         notas=nota_iva,
         archivo_pdf_path=ruta_pdf,
     )
+
+    return factura, campos

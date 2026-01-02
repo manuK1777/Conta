@@ -515,18 +515,21 @@ def import_facturas(
         ruta = os.path.join(carpeta, nombre)
 
         try:
-            factura_in = importar_factura_pdf(ruta)
+            factura_in, campos = importar_factura_pdf(ruta)
 
-            # Cálculos fiscales
-            cuota_iva = (
-                factura_in.base_eur * factura_in.tipo_iva / Decimal("100")
-            ).quantize(Decimal("0.01"))
+            # Importes estrictamente del PDF
+            total = campos.get("total")
+            if total is None:
+                raise ValueError("No se encontró TOTAL en el PDF")
 
-            ret_irpf = (
-                factura_in.base_eur * factura_in.ret_irpf_pct / Decimal("100")
-            ).quantize(Decimal("0.01"))
+            cuota_iva = campos.get("iva_importe")
+            if cuota_iva is None:
+                cuota_iva = Decimal("0.00")
 
-            total = (factura_in.base_eur + cuota_iva - ret_irpf).quantize(Decimal("0.01"))
+            ret_irpf = campos.get("irpf_importe")
+            if ret_irpf is None:
+                ret_irpf = Decimal("0.00")
+            ret_irpf = abs(ret_irpf)
 
             factura_db = FacturaEmitida(
                 **factura_in.model_dump(),
@@ -552,8 +555,8 @@ def import_facturas(
                         f"[blue]→ {factura_db.numero} | "
                         f"{factura_db.fecha_emision} | "
                         f"{factura_db.base_eur} € | "
-                        f"IVA {factura_db.tipo_iva}% | "
-                        f"IRPF {factura_db.ret_irpf_pct}% | "
+                        f"IVA {factura_db.tipo_iva}% ({cuota_iva} €) | "
+                        f"IRPF {factura_db.ret_irpf_pct}% ({ret_irpf} €) | "
                         f"TOTAL {total} €[/blue]"
                     )
                 else:
