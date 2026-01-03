@@ -318,6 +318,7 @@ def list_gastos(
     t.add_column("Afecto (%)", justify="right")
     t.add_column("Base (EUR)", justify="right")
     t.add_column("IVA (EUR)", justify="right")
+    t.add_column("TOTAL (EUR)", justify="right")
 
     def _fmt_eur(v: _Decimal) -> str:
         return format(v.quantize(_Decimal("0.01")), "f")
@@ -342,6 +343,7 @@ def list_gastos(
             _fmt_pct(g.afecto_pct),
             _fmt_eur(g.base_eur),
             _fmt_eur(g.cuota_iva),
+            _fmt_eur(g.base_eur + g.cuota_iva),
         )
 
     print(t)
