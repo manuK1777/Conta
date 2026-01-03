@@ -161,6 +161,78 @@ def list_facturas(
     print(t)
 
 
+@app.command("facturas-all")
+def list_facturas_all(
+    limit: int = typer.Option(200, help="Máximo de facturas a mostrar"),
+    desc: bool = typer.Option(False, help="Orden descendente"),
+):
+    """Lista todas las columnas de facturas emitidas."""
+    from sqlmodel import select
+    from decimal import Decimal as _Decimal
+
+    stmt = select(FacturaEmitida)
+    stmt = stmt.order_by(
+        FacturaEmitida.fecha_emision.desc() if desc else FacturaEmitida.fecha_emision,
+        FacturaEmitida.numero.desc() if desc else FacturaEmitida.numero,
+    )
+    if limit is not None and limit > 0:
+        stmt = stmt.limit(limit)
+
+    with get_session() as s:
+        facturas = list(s.exec(stmt).all())
+
+    t = Table(title="Facturas emitidas (todas las columnas)")
+    t.add_column("ID", justify="right")
+    t.add_column("Número")
+    t.add_column("Fecha")
+    t.add_column("Trimestre")
+    t.add_column("Cliente")
+    t.add_column("Cliente NIF")
+    t.add_column("País")
+    t.add_column("Base (EUR)", justify="right")
+    t.add_column("Tipo IVA (%)", justify="right")
+    t.add_column("IVA (EUR)", justify="right")
+    t.add_column("Ret IRPF (%)", justify="right")
+    t.add_column("IRPF (EUR)", justify="right")
+    t.add_column("Actividad")
+    t.add_column("Notas")
+    t.add_column("PDF")
+
+    def _fmt_eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    def _fmt_pct(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    def _fmt_quarter(d: date) -> str:
+        q = ((d.month - 1) // 3) + 1
+        return f"{d.year}Q{q}"
+
+    def _fmt_fecha(d: date) -> str:
+        return d.strftime("%d-%m-%Y")
+
+    for f in facturas:
+        t.add_row(
+            str(f.id or ""),
+            f.numero,
+            _fmt_fecha(f.fecha_emision),
+            _fmt_quarter(f.fecha_emision),
+            f.cliente_nombre,
+            str(f.cliente_nif or ""),
+            str(f.pais or ""),
+            _fmt_eur(f.base_eur),
+            _fmt_pct(f.tipo_iva),
+            _fmt_eur(f.cuota_iva),
+            _fmt_pct(f.ret_irpf_pct),
+            _fmt_eur(f.ret_irpf_importe),
+            str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
+            str(f.notas or ""),
+            str(f.archivo_pdf_path or ""),
+        )
+
+    print(t)
+
+
 @app.command("cuota")
 def add_cuota(
     fecha: str,
