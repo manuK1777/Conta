@@ -16,7 +16,10 @@ def extraer_campos_comunes(texto: str) -> dict:
         "numero": buscar(r"FACTURA\s+NÚM\.?\s*([0-9\s]+)", texto),
         "base": buscar_decimal(r"HONORARIS\s+([0-9\.,]+)", texto),
         "total": buscar_decimal(r"TOTAL\s+([0-9\.,]+)", texto),
-        "fecha_raw": buscar(r"Barcelona,\s*(.+)", texto),
+        "fecha_raw": buscar(
+            r"(\d{1,2}\s+(?:de|d[’'])\s*[A-Za-zÀ-ÿ\u00b7]+(?:\s+de)?\s+\d{4})",
+            texto,
+        ),
         "cliente_nombre": buscar(r"\n([A-Z][A-Z\s\.]+)\n", texto),
         "cliente_nif": buscar(r"NIF:\s*([A-Z0-9]+)", texto),
         # Importes fiscales (si aparecen como línea con % + importe)
