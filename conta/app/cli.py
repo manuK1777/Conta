@@ -17,6 +17,13 @@ from .services.importacion_pdf.importador_factura import importar_factura_pdf
 app = typer.Typer(help="CLI de contabilidad personal para autónomos")
 
 
+def _parse_fecha_cli(v: str) -> date:
+    try:
+        return datetime.strptime(v, "%d-%m-%Y").date()
+    except ValueError:
+        return date.fromisoformat(v)
+
+
 @app.command()
 def init():
     """Crea la base de datos y tablas."""
@@ -25,22 +32,32 @@ def init():
 
 @app.command("emite")
 def add_factura(
-numero: str,
-fecha: str,
-cliente_nombre: str,
-base: str,
-tipo_iva: str = "21.00",
-ret_irpf_pct: str = "0.00",
-actividad: Actividad = Actividad.programacion,
-cliente_nif: str = typer.Option(None),
-pais: str = typer.Option(None),
-notas: str = typer.Option(None),
-pdf: str = typer.Option(None, help="Ruta del PDF")
+    numero: str,
+    fecha: str,
+    cliente_nombre: str,
+    base: str,
+    tipo_iva: str = "21.00",
+    ret_irpf_pct: str = "0.00",
+    actividad: Actividad = Actividad.programacion,
+    cliente_nif: str = typer.Option(None),
+    pais: str = typer.Option(None),
+    notas: str = typer.Option(None),
+    pdf: str = typer.Option(None, help="Ruta del PDF"),
 ):
     """Añade una factura emitida."""
+
+    try:
+        fecha_dt = _parse_fecha_cli(fecha)
+    except Exception:
+        typer.secho(
+            "Fecha inválida. Usa DD-MM-YYYY (o YYYY-MM-DD)",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
     f = FacturaIn(
         numero=numero,
-        fecha_emision=date.fromisoformat(fecha),
+        fecha_emision=fecha_dt,
         cliente_nombre=cliente_nombre,
         cliente_nif=cliente_nif,
         pais=pais,
@@ -76,9 +93,19 @@ def add_gasto(
     pdf: str = typer.Option(None, help="Ruta del PDF")
 ):
     """Añade un gasto deducible."""
+
+    try:
+        fecha_dt = _parse_fecha_cli(fecha)
+    except Exception:
+        typer.secho(
+            "Fecha inválida. Usa DD-MM-YYYY (o YYYY-MM-DD)",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
     g = GastoIn(
         proveedor=proveedor,
-        fecha=date.fromisoformat(fecha),
+        fecha=fecha_dt,
         base_eur=Decimal(base),
         tipo_iva=Decimal(tipo_iva),
         afecto_pct=Decimal(afecto_pct),
@@ -241,17 +268,11 @@ def add_cuota(
 ):
     """Añade una cuota de autónomos."""
 
-    def _parse_fecha(v: str) -> date:
-        try:
-            return date.fromisoformat(v)
-        except ValueError:
-            return datetime.strptime(v, "%d-%m-%Y").date()
-
     try:
-        fecha_dt = _parse_fecha(fecha)
+        fecha_dt = _parse_fecha_cli(fecha)
     except Exception:
         typer.secho(
-            "Fecha inválida. Usa YYYY-MM-DD o DD-MM-YYYY",
+            "Fecha inválida. Usa DD-MM-YYYY (o YYYY-MM-DD)",
             fg=typer.colors.RED,
         )
         raise typer.Exit(code=1)
