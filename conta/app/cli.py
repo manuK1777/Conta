@@ -455,7 +455,15 @@ def list_gastos(
     def _fmt_fecha(d: date) -> str:
         return d.strftime("%d-%m-%Y")
 
+    total_base = _Decimal("0.00")
+    total_iva = _Decimal("0.00")
+    total_total = _Decimal("0.00")
+
     for g in gastos:
+        row_total = g.base_eur + g.cuota_iva
+        total_base += g.base_eur
+        total_iva += g.cuota_iva
+        total_total += row_total
         t.add_row(
             str(g.id or ""),
             g.proveedor,
@@ -465,7 +473,23 @@ def list_gastos(
             _fmt_pct(g.afecto_pct),
             _fmt_eur(g.base_eur),
             _fmt_eur(g.cuota_iva),
-            _fmt_eur(g.base_eur + g.cuota_iva),
+            _fmt_eur(row_total),
+        )
+
+    if gastos:
+        # Fila en blanco de separación
+        t.add_row(*([""] * 9))
+        # Fila de totales (Base, IVA y TOTAL)
+        t.add_row(
+            "",
+            "",
+            "",
+            "",
+            "[bold]TOTAL[/bold]",
+            "",
+            f"[bold]{_fmt_eur(total_base)}[/bold]",
+            f"[bold]{_fmt_eur(total_iva)}[/bold]",
+            f"[bold]{_fmt_eur(total_total)}[/bold]",
         )
 
     print(t)
