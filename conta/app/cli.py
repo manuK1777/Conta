@@ -203,6 +203,7 @@ def list_facturas(
     t.add_column("Base (EUR)", justify="right")
     t.add_column("IVA (EUR)", justify="right")
     t.add_column("IRPF (EUR)", justify="right")
+    t.add_column("TOTAL (EUR)", justify="right")
     t.add_column("Actividad")
 
     def _fmt_eur(v: _Decimal) -> str:
@@ -215,7 +216,17 @@ def list_facturas(
     def _fmt_fecha(d: date) -> str:
         return d.strftime("%d-%m-%Y")
 
+    total_base = _Decimal("0.00")
+    total_iva = _Decimal("0.00")
+    total_irpf = _Decimal("0.00")
+    total_total = _Decimal("0.00")
+
     for f in facturas:
+        row_total = f.base_eur + f.cuota_iva - f.ret_irpf_importe
+        total_base += f.base_eur
+        total_iva += f.cuota_iva
+        total_irpf += f.ret_irpf_importe
+        total_total += row_total
         t.add_row(
             str(f.id or ""),
             f.numero,
@@ -225,7 +236,25 @@ def list_facturas(
             _fmt_eur(f.base_eur),
             _fmt_eur(f.cuota_iva),
             _fmt_eur(f.ret_irpf_importe),
+            _fmt_eur(row_total),
             str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
+        )
+
+    if facturas:
+        # Fila en blanco de separación
+        t.add_row(*([""] * 10))
+        # Fila de totales (Base, IVA y TOTAL)
+        t.add_row(
+            "",
+            "",
+            "",
+            "",
+            "[bold]TOTAL[/bold]",
+            f"[bold]{_fmt_eur(total_base)}[/bold]",
+            f"[bold]{_fmt_eur(total_iva)}[/bold]",
+            f"[bold]{_fmt_eur(total_irpf)}[/bold]",
+            f"[bold]{_fmt_eur(total_total)}[/bold]",
+            "",
         )
 
     print(t)
