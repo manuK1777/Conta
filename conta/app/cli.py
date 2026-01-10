@@ -203,6 +203,7 @@ def list_facturas(
     t.add_column("Base (EUR)", justify="right")
     t.add_column("IVA (EUR)", justify="right")
     t.add_column("IRPF (EUR)", justify="right")
+    t.add_column("Percibido (EUR)", justify="right")
     t.add_column("TOTAL (EUR)", justify="right")
     t.add_column("Actividad")
 
@@ -219,13 +220,16 @@ def list_facturas(
     total_base = _Decimal("0.00")
     total_iva = _Decimal("0.00")
     total_irpf = _Decimal("0.00")
+    total_percibido = _Decimal("0.00")
     total_total = _Decimal("0.00")
 
     for f in facturas:
+        row_percibido = f.base_eur - f.ret_irpf_importe
         row_total = f.base_eur + f.cuota_iva - f.ret_irpf_importe
         total_base += f.base_eur
         total_iva += f.cuota_iva
         total_irpf += f.ret_irpf_importe
+        total_percibido += row_percibido
         total_total += row_total
         t.add_row(
             str(f.id or ""),
@@ -236,13 +240,14 @@ def list_facturas(
             _fmt_eur(f.base_eur),
             _fmt_eur(f.cuota_iva),
             _fmt_eur(f.ret_irpf_importe),
+            _fmt_eur(row_percibido),
             _fmt_eur(row_total),
             str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
         )
 
     if facturas:
         # Fila en blanco de separación
-        t.add_row(*([""] * 10))
+        t.add_row(*([""] * 11))
         # Fila de totales (Base, IVA y TOTAL)
         t.add_row(
             "",
@@ -253,6 +258,7 @@ def list_facturas(
             f"[bold]{_fmt_eur(total_base)}[/bold]",
             f"[bold]{_fmt_eur(total_iva)}[/bold]",
             f"[bold]{_fmt_eur(total_irpf)}[/bold]",
+            f"[bold]{_fmt_eur(total_percibido)}[/bold]",
             f"[bold]{_fmt_eur(total_total)}[/bold]",
             "",
         )
