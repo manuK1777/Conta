@@ -87,7 +87,7 @@ def add_gasto(
     proveedor: str,
     fecha: str,
     base: str,
-    tipo_iva: str = "21.00",
+    iva: str,
     afecto_pct: str = "100.00",
     tipo: str = typer.Option(None),
     pdf: str = typer.Option(None, help="Ruta del PDF")
@@ -103,17 +103,34 @@ def add_gasto(
         )
         raise typer.Exit(code=1)
 
+    try:
+        base_dec = Decimal(base)
+        iva_dec = Decimal(iva)
+    except Exception:
+        typer.secho(
+            "Importes inválidos. Usa formato 123.45 para base e IVA",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    # Calcula el porcentaje de IVA a partir de base e IVA
+    if base_dec == 0:
+        tipo_iva_pct = Decimal("0.00")
+    else:
+        tipo_iva_pct = (iva_dec * Decimal("100")) / base_dec
+
     g = GastoIn(
         proveedor=proveedor,
         fecha=fecha_dt,
-        base_eur=Decimal(base),
-        tipo_iva=Decimal(tipo_iva),
+        base_eur=base_dec,
+        tipo_iva=tipo_iva_pct,
         afecto_pct=Decimal(afecto_pct),
         tipo=tipo,
         archivo_pdf_path=pdf,
     )
 
-    cuota_iva = (g.base_eur * g.tipo_iva / 100).quantize(Decimal("0.01"))
+    # Usa el IVA introducido por el usuario como cuota de IVA
+    cuota_iva = iva_dec.quantize(Decimal("0.01"))
     m = GastoDeducible(
         proveedor=g.proveedor,
         proveedor_nif=g.proveedor_nif,
