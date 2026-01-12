@@ -13,7 +13,13 @@ def buscar_decimal(patron: str, texto: str):
 
 def extraer_campos_comunes(texto: str) -> dict:
     return {
-        "numero": buscar(r"FACTURA\s+NÚM\.?\s*([0-9\s]+)", texto),
+        # Admite formatos como "FACTURA NÚM. 1234" y "Factura B01 25 (sin IVA)"
+        # Captura un código alfanumérico con espacios tras "FACTURA" y
+        # un "NÚM." opcional, hasta antes de paréntesis o salto de línea.
+        "numero": buscar(
+            r"FACTURA\s+(?:N[ÚU]M\.?\s*)?([A-Z0-9/\- ]+)",
+            texto,
+        ),
         "base": buscar_decimal(r"HONORARIS\s+([0-9\.,]+)", texto),
         "total": buscar_decimal(r"TOTAL\s+([0-9\.,]+)", texto),
         "fecha_raw": buscar(
