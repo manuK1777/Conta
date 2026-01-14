@@ -151,6 +151,7 @@ def add_gasto(
 @app.command("facturas")
 def list_facturas(
     periodo: str = typer.Argument(None, help="Periodo en formato YYYYQ#, ej: 2025Q4"),
+    actividad: Actividad | None = typer.Option(None, help="Filtrar por actividad"),
     limit: int = typer.Option(200, help="Máximo de facturas a mostrar"),
     desc: bool = typer.Option(False, help="Orden descendente"),
 ):
@@ -184,6 +185,8 @@ def list_facturas(
             (FacturaEmitida.fecha_emision >= start_date)
             & (FacturaEmitida.fecha_emision < end_date)
         )
+    if actividad is not None:
+        stmt = stmt.where(FacturaEmitida.actividad == actividad)
     stmt = stmt.order_by(
         FacturaEmitida.fecha_emision.desc() if desc else FacturaEmitida.fecha_emision,
         FacturaEmitida.numero.desc() if desc else FacturaEmitida.numero,
