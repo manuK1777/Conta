@@ -520,13 +520,24 @@ def calcular_iva(
 
     t = Table(title=f"IVA – Modelo 303 ({periodo})")
     t.add_column("Concepto")
-    t.add_column("Importe (EUR)", justify="right")
+    t.add_column("Base (EUR)", justify="right")
+    t.add_column("Cuota (EUR)", justify="right")
 
-    t.add_row("IVA devengado (ventas)", _fmt_eur(res["iva_devengado"]))
-    t.add_row("IVA deducible (compras)", _fmt_eur(res["iva_deducible"]))
-    t.add_row("", "")
+    # Bases: suma de bases de facturas emitidas / gastos deducibles (ponderados por afecto)
+    t.add_row(
+        "IVA devengado (ventas)",
+        _fmt_eur(res["base_devengado"]),
+        _fmt_eur(res["iva_devengado"]),
+    )
+    t.add_row(
+        "IVA deducible (compras)",
+        _fmt_eur(res["base_deducible"]),
+        _fmt_eur(res["iva_deducible"]),
+    )
+    t.add_row("", "", "")
     t.add_row(
         "[bold]Resultado[/bold]",
+        "",
         f"[bold]{_fmt_eur(res['resultado'])}[/bold]",
     )
 
