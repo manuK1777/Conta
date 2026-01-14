@@ -599,13 +599,6 @@ def calcular_iva390(
 
     print(t)
 
-    if resultado > 0:
-        print("[green]Resultado: IVA a ingresar[/green]")
-    elif resultado < 0:
-        print("[yellow]Resultado: IVA a compensar o devolver[/yellow]")
-    else:
-        print("[blue]Resultado: IVA neutro[/blue]")
-
     # Tabla de detalle por trimestre
     t_det = Table(title=f"Detalle trimestres IVA ({anio})")
     t_det.add_column("Periodo")
