@@ -565,18 +565,23 @@ def calcular_iva390(
         typer.secho("Año inválido. Usa un año tipo 2025", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
+    total_base = _Decimal("0.00")
     total_devengado = _Decimal("0.00")
     total_deducible = _Decimal("0.00")
-    detalles: list[tuple[str, _Decimal, _Decimal, _Decimal]] = []
+    detalles: list[tuple[str, _Decimal, _Decimal, _Decimal, _Decimal]] = []
 
     # Suma los cuatro trimestres del año y guarda detalle
     for q in (1, 2, 3, 4):
         res_q = iva_trimestre(anio, q)
+        # Base: solo facturas emitidas con IVA > 0 (base_devengado)
+        base_q = res_q["base_devengado"]
+        total_base += base_q
         total_devengado += res_q["iva_devengado"]
         total_deducible += res_q["iva_deducible"]
         detalles.append(
             (
                 f"{anio}Q{q}",
+                base_q,
                 res_q["iva_devengado"],
                 res_q["iva_deducible"],
                 res_q["resultado"],
@@ -605,13 +610,15 @@ def calcular_iva390(
     # Tabla de detalle por trimestre
     t_det = Table(title=f"Detalle trimestres IVA ({anio})")
     t_det.add_column("Periodo")
+    t_det.add_column("Base (EUR)", justify="right")
     t_det.add_column("IVA devengado (EUR)", justify="right")
     t_det.add_column("IVA deducible (EUR)", justify="right")
     t_det.add_column("Resultado (EUR)", justify="right")
 
-    for periodo, dev, ded, res_q in detalles:
+    for periodo, base_q, dev, ded, res_q in detalles:
         t_det.add_row(
             periodo,
+            _fmt_eur(base_q),
             _fmt_eur(dev),
             _fmt_eur(ded),
             _fmt_eur(res_q),
@@ -619,10 +626,11 @@ def calcular_iva390(
 
     if detalles:
         # Fila en blanco de separación
-        t_det.add_row("", "", "", "")
+        t_det.add_row("", "", "", "", "")
         # Fila de totales por columnas
         t_det.add_row(
             "[bold]TOTAL[/bold]",
+            f"[bold]{_fmt_eur(total_base)}[/bold]",
             f"[bold]{_fmt_eur(total_devengado)}[/bold]",
             f"[bold]{_fmt_eur(total_deducible)}[/bold]",
             f"[bold]{_fmt_eur(resultado)}[/bold]",
