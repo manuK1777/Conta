@@ -779,14 +779,43 @@ def calcular_m130(
 
 
 @app.command("cuotas")
-def list_cuotas():
+def list_cuotas(
+    periodo: str = typer.Argument(None, help="Periodo en formato YYYYQ#, ej: 2025Q3"),
+):
     """Lista cuotas de autónomos."""
     from sqlmodel import select
     from rich.table import Table
     from decimal import Decimal as _Decimal
 
+    if periodo:
+        try:
+            year = int(periodo[:4])
+            q = int(periodo[-1])
+            if q not in (1, 2, 3, 4):
+                raise ValueError
+        except ValueError:
+            typer.secho(
+                "Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+
+        start_month = 1 + (q - 1) * 3
+        start_date = date(year, start_month, 1)
+        if q == 4:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, start_month + 3, 1)
+
+    stmt = select(PagoAutonomo)
+    if periodo:
+        stmt = stmt.where(
+            (PagoAutonomo.fecha >= start_date) & (PagoAutonomo.fecha < end_date)
+        )
+    stmt = stmt.order_by(PagoAutonomo.fecha)
+
     with get_session() as s:
-        cuotas = s.exec(select(PagoAutonomo).order_by(PagoAutonomo.fecha)).all()
+        cuotas = s.exec(stmt).all()
 
     t = Table(title="Cuotas de autónomos")
     t.add_column("Fecha")
