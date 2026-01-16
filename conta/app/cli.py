@@ -4,7 +4,13 @@ from rich.table import Table
 from decimal import Decimal
 from datetime import date, datetime
 from .db import init_db, get_session
-from .models import FacturaEmitida, GastoDeducible, Actividad, PagoAutonomo
+from .models import (
+    FacturaEmitida,
+    GastoDeducible,
+    Actividad,
+    PagoAutonomo,
+    PagoFraccionado130,
+)
 from .schemas import FacturaIn, GastoIn, CuotaAutonomoIn
 from sqlmodel import select
 from .services.iva import iva_trimestre
@@ -389,6 +395,77 @@ def add_cuota(
         s.commit()
 
     print("[green]\u2713 Cuota guardada[/green]")
+
+
+@app.command("pagar-m130")
+def pagar_m130(
+    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q3"),
+    importe: str = typer.Argument(..., help="Importe ingresado"),
+):
+    """
+    Registra el pago de un Modelo 130 presentado.
+    Imprescindible para el cálculo correcto de trimestres posteriores.
+    """
+    from datetime import date
+    from decimal import Decimal
+    from sqlmodel import select
+
+    def _parse_importe(v: str) -> Decimal:
+        # Permite formato ES con coma decimal (p.ej. 529,32)
+        normalized = v.strip().replace(" ", "").replace(",", ".")
+        return Decimal(normalized)
+
+    try:
+        year = int(periodo[:4])
+        q = int(periodo[-1])
+        if q not in (1, 2, 3, 4):
+            raise ValueError
+    except ValueError:
+        typer.secho("Periodo inválido. Usa YYYYQ#", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        importe_dec = _parse_importe(importe)
+    except Exception:
+        typer.secho(
+            "Importe inválido. Usa formato 123.45 (o 123,45)",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    if importe_dec <= 0:
+        typer.secho("El importe debe ser positivo", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    with get_session() as s:
+        existente = s.exec(
+            select(PagoFraccionado130).where(
+                PagoFraccionado130.year == year,
+                PagoFraccionado130.quarter == q,
+            )
+        ).first()
+
+        if existente:
+            typer.secho(
+                f"Ya existe un pago registrado para {periodo}",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+        pago = PagoFraccionado130(
+            year=year,
+            quarter=q,
+            importe=importe_dec.quantize(Decimal("0.01")),
+            fecha_pago=date.today(),
+        )
+
+        s.add(pago)
+        s.commit()
+
+    typer.secho(
+        f"✔ Pago fraccionado 130 registrado: {periodo} → {importe_dec.quantize(Decimal('0.01'))} €",
+        fg=typer.colors.GREEN,
+    )
 
 
 @app.command("gastos")
