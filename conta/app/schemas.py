@@ -39,3 +39,24 @@ class CuotaAutonomoIn(BaseModel):
         if v <= 0:
             raise ValueError("La cuota de autónomos debe ser mayor que 0")
         return v.quantize(Decimal("0.01"))    
+
+
+class PagoFraccionado130In(BaseModel):
+    year: int
+    quarter: int
+    importe: Decimal
+    fecha_pago: date
+
+    @field_validator("importe")
+    @classmethod
+    def importe_positive(cls, v: Decimal):
+        if v <= 0:
+            raise ValueError("El pago fraccionado debe ser mayor que 0")
+        return v.quantize(Decimal("0.01"))
+
+    @field_validator("quarter")
+    @classmethod
+    def quarter_valid(cls, v: int):
+        if v not in (1, 2, 3, 4):
+            raise ValueError("El trimestre debe estar entre 1 y 4")
+        return v

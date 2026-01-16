@@ -1,58 +1,42 @@
-from decimal import Decimal, ROUND_HALF_UP
 from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 from sqlmodel import select
 
 from ..models import (
     FacturaEmitida,
     GastoDeducible,
     PagoAutonomo,
+    PagoFraccionado130,
     Actividad,
 )
 from ..db import get_session
 
-
 TWOPLACES = Decimal("0.01")
 
 
-def quarter_range(year: int, q: int):
-    """
-    Devuelve (fecha_inicio, fecha_fin) del trimestre.
-    """
-    assert 1 <= q <= 4
-    start_month = (q - 1) * 3 + 1
-    start = date(year, start_month, 1)
-
+def quarter_end(year: int, q: int) -> date:
     if q == 1:
-        end = date(year, 3, 31)
-    elif q == 2:
-        end = date(year, 6, 30)
-    elif q == 3:
-        end = date(year, 9, 30)
-    else:
-        end = date(year, 12, 31)
+        return date(year, 3, 31)
+    if q == 2:
+        return date(year, 6, 30)
+    if q == 3:
+        return date(year, 9, 30)
+    if q == 4:
+        return date(year, 12, 31)
+    raise ValueError("Trimestre inválido")
 
-    return start, end
 
-
-def irpf_modelo130(
+def irpf_snapshot_acumulado(
     year: int,
     q: int,
     solo_programacion: bool = False,
 ):
     """
-    Reproduce el MODELO 130 oficial (apartado I),
-    tal como lo acepta la AEAT, y como el que tú presentaste.
-
-    - Incluye todas las actividades por defecto
-    - Incluye retenciones soportadas (músico)
-    - Incluye cuotas de autónomos como gasto deducible
-
-    Si solo_programacion=True:
-    - Solo facturas de programación
-    - No incluye retenciones
-    - MODO ANALÍTICO (NO oficial)
+    Snapshot fiscal acumulado IRPF (1 enero → fin trimestre).
+    BASE del Modelo 130 oficial (apartado I).
     """
-    start, end = quarter_range(year, q)
+    start = date(year, 1, 1)
+    end = quarter_end(year, q)
 
     with get_session() as s:
         # FACTURAS
@@ -63,7 +47,6 @@ def irpf_modelo130(
             stmt_f = stmt_f.where(
                 FacturaEmitida.actividad == Actividad.programacion
             )
-
         facturas = s.exec(stmt_f).all()
 
         # GASTOS
@@ -73,80 +56,70 @@ def irpf_modelo130(
             )
         ).all()
 
-        # CUOTAS AUTÓNOMOS
+        # CUOTAS AUTÓNOMOS (por devengo)
         cuotas = s.exec(
             select(PagoAutonomo).where(
                 PagoAutonomo.fecha.between(start, end)
             )
         ).all()
 
-    # ─────────────────────────────────────────────
-    # CASILLA 01 – INGRESOS
-    # ─────────────────────────────────────────────
+        # PAGOS FRACCIONADOS PREVIOS
+        pagos_previos = s.exec(
+            select(PagoFraccionado130).where(
+                PagoFraccionado130.year == year,
+                PagoFraccionado130.quarter < q,
+                PagoFraccionado130.importe > 0,
+            )
+        ).all()
+
     ingresos = sum((f.base_eur for f in facturas), Decimal("0"))
 
-    # ─────────────────────────────────────────────
-    # CASILLA 02 – GASTOS DEDUCIBLES
-    # (gastos + cuotas SS)
-    # ─────────────────────────────────────────────
-    gastos_deducibles = sum(
+    gastos_sin_ss = sum(
         (g.base_eur * g.afecto_pct / Decimal("100") for g in gastos),
         Decimal("0"),
     )
 
     cuotas_ss = sum((c.importe_eur for c in cuotas), Decimal("0"))
+    total_gastos = gastos_sin_ss + cuotas_ss
 
-    total_gastos = gastos_deducibles + cuotas_ss
-
-    # ─────────────────────────────────────────────
-    # CASILLA 03 – RENDIMIENTO NETO
-    # ─────────────────────────────────────────────
     rendimiento = ingresos - total_gastos
 
-    # ─────────────────────────────────────────────
-    # CASILLA 04 – 20 %
-    # ─────────────────────────────────────────────
-    if rendimiento > 0:
-        base_20 = (rendimiento * Decimal("0.20")).quantize(
-            TWOPLACES, rounding=ROUND_HALF_UP
-        )
-    else:
-        base_20 = Decimal("0.00")
+    base_20 = (
+        (rendimiento * Decimal("0.20"))
+        .quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+        if rendimiento > 0
+        else Decimal("0.00")
+    )
 
-    # ─────────────────────────────────────────────
-    # CASILLA 06 – RETENCIONES SOPORTADAS
-    # (solo en modo oficial)
-    # ─────────────────────────────────────────────
     if solo_programacion:
         retenciones = Decimal("0.00")
     else:
         retenciones = sum(
             (f.ret_irpf_importe for f in facturas),
             Decimal("0"),
-        )
+        ).quantize(TWOPLACES)
 
-    retenciones = retenciones.quantize(TWOPLACES)
+    pagos_previos_total = sum(
+        (p.importe for p in pagos_previos), Decimal("0")
+    ).quantize(TWOPLACES)
 
-    # ─────────────────────────────────────────────
-    # CASILLA 07 – RESULTADO
-    # ─────────────────────────────────────────────
-    resultado = (base_20 - retenciones).quantize(
-        TWOPLACES, rounding=ROUND_HALF_UP
-    )
+    resultado = (
+        base_20
+        - retenciones
+        - pagos_previos_total
+    ).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
     return {
-        "periodo": f"{year}Q{q}",
-        # Casillas
         "ingresos": ingresos.quantize(TWOPLACES),
         "gastos": total_gastos.quantize(TWOPLACES),
         "rendimiento": rendimiento.quantize(TWOPLACES),
         "base_20": base_20,
         "retenciones": retenciones,
+        "pagos_previos": pagos_previos_total,
         "resultado": resultado,
-        # Info adicional
-        "solo_programacion": solo_programacion,
         "detalle": {
-            "gastos_sin_cuotas": gastos_deducibles.quantize(TWOPLACES),
+            "gastos_sin_cuotas": gastos_sin_ss.quantize(TWOPLACES),
             "cuotas_ss": cuotas_ss.quantize(TWOPLACES),
         },
     }
+

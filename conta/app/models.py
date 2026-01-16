@@ -46,3 +46,11 @@ class PagoAutonomo(SQLModel, table=True):
     fecha: date = Field(index=True)
     importe_eur: Decimal
     concepto: str | None = None
+
+
+class PagoFraccionado130(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    year: int
+    quarter: int
+    importe: Decimal
+    fecha_pago: date
