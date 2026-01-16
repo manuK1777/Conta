@@ -8,7 +8,7 @@ from .models import FacturaEmitida, GastoDeducible, Actividad, PagoAutonomo
 from .schemas import FacturaIn, GastoIn, CuotaAutonomoIn
 from sqlmodel import select
 from .services.iva import iva_trimestre
-from .services.irpf import irpf_modelo130
+from .services.irpf import irpf_snapshot_acumulado
 from .services.libros import export_libros
 from .services.importacion_pdf.importador_factura import importar_factura_pdf
 
@@ -497,6 +497,7 @@ def list_gastos(
 
     print(t)
 
+
 @app.command("iva")
 def calcular_iva(
     periodo: str = typer.Argument(..., help="Periodo en formato YYYYQ#, ej: 2025Q3")
@@ -554,98 +555,59 @@ def calcular_iva(
         print("[blue]Resultado: IVA neutro[/blue]")
 
 
-@app.command("iva390")
-def calcular_iva390(
-    anio: int = typer.Argument(..., help="Año completo, ej: 2025"),
+@app.command("m130")
+def calcular_m130(
+    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q4"),
+    solo_programacion: bool = typer.Option(
+        False,
+        "--solo-programacion",
+        help="Modo análisis (NO oficial)",
+    ),
 ):
-    """Resumen anual de IVA – Modelo 390 para un año."""
-    from decimal import Decimal as _Decimal
+    """
+    Modelo 130 – IRPF (apartado I).
+    Reproducción fiel del modelo AEAT (acumulado).
+    """
+    from decimal import Decimal
+    from rich.table import Table
 
-    if anio < 1900 or anio > 2100:
-        typer.secho("Año inválido. Usa un año tipo 2025", fg=typer.colors.RED)
-        raise typer.Exit(code=1)
+    year = int(periodo[:4])
+    q = int(periodo[-1])
 
-    total_base = _Decimal("0.00")  # base devengada (facturas con IVA > 0)
-    total_base_deducible = _Decimal("0.00")  # base de gastos deducibles
-    total_devengado = _Decimal("0.00")
-    total_deducible = _Decimal("0.00")
-    detalles: list[tuple[str, _Decimal, _Decimal, _Decimal, _Decimal, _Decimal]] = []
+    r = irpf_snapshot_acumulado(year, q, solo_programacion)
 
-    # Suma los cuatro trimestres del año y guarda detalle
-    for q in (1, 2, 3, 4):
-        res_q = iva_trimestre(anio, q)
-        # Base devengada: solo facturas emitidas con IVA > 0 (base_devengado)
-        base_dev_q = res_q["base_devengado"]
-        # Base deducible: base de gastos deducibles ponderada por afecto_pct
-        base_ded_q = res_q["base_deducible"]
+    def eur(v: Decimal) -> str:
+        return format(v.quantize(Decimal("0.01")), "f")
 
-        total_base += base_dev_q
-        total_base_deducible += base_ded_q
-        total_devengado += res_q["iva_devengado"]
-        total_deducible += res_q["iva_deducible"]
-        detalles.append(
-            (
-                f"{anio}Q{q}",
-                base_dev_q,
-                base_ded_q,
-                res_q["iva_devengado"],
-                res_q["iva_deducible"],
-                res_q["resultado"],
-            )
-        )
-
-    resultado = total_devengado - total_deducible
-
-    def _fmt_eur(v: _Decimal) -> str:
-        return format(v.quantize(_Decimal("0.01")), "f")
-
-    t = Table(title=f"IVA – Modelo 390 ({anio})")
+    t = Table(title=f"Modelo 130 – IRPF ({periodo})")
+    t.add_column("Casilla", justify="right")
     t.add_column("Concepto")
-    t.add_column("Importe (EUR)", justify="right")
+    t.add_column("Importe (€)", justify="right")
 
-    t.add_row("IVA devengado (ventas)", _fmt_eur(total_devengado))
-    t.add_row("IVA deducible (compras)", _fmt_eur(total_deducible))
-    t.add_row("", "")
+    t.add_row("01", "Ingresos computables (acumulado)", eur(r["ingresos"]))
+    t.add_row("02", "Gastos deducibles + Cuotas SS", f"-{eur(r['gastos'])}")
+    t.add_row("03", "Rendimiento neto", eur(r["rendimiento"]))
+    t.add_row("04", "20 % del rendimiento", eur(r["base_20"]))
+    t.add_row("05", "Pagos fraccionados anteriores", f"-{eur(r['pagos_previos'])}")
+    t.add_row("06", "Retenciones soportadas", f"-{eur(r['retenciones'])}")
     t.add_row(
-        "[bold]Resultado[/bold]",
-        f"[bold]{_fmt_eur(resultado)}[/bold]",
+        "07",
+        "[bold]Resultado pago fraccionado[/bold]",
+        f"[bold]{eur(r['resultado'])}[/bold]",
     )
 
     print(t)
 
-    # Tabla de detalle por trimestre
-    t_det = Table(title=f"Detalle trimestres IVA ({anio})")
-    t_det.add_column("Periodo")
-    t_det.add_column("Base devengada (EUR)", justify="right")
-    t_det.add_column("IVA devengado (EUR)", justify="right")
-    t_det.add_column("IVA deducible Base (EUR)", justify="right")
-    t_det.add_column("IVA deducible (EUR)", justify="right")
-    t_det.add_column("Resultado (EUR)", justify="right")
+    d = r["detalle"]
+    td = Table(title="Detalle informativo (no oficial)")
+    td.add_column("Concepto")
+    td.add_column("Importe (€)", justify="right")
+    td.add_row("Gastos sin SS", eur(d["gastos_sin_cuotas"]))
+    td.add_row("Cuotas autónomos", eur(d["cuotas_ss"]))
+    print(td)
 
-    for periodo, base_dev_q, base_ded_q, dev, ded, res_q in detalles:
-        t_det.add_row(
-            periodo,
-            _fmt_eur(base_dev_q),
-            _fmt_eur(dev),
-            _fmt_eur(base_ded_q),
-            _fmt_eur(ded),
-            _fmt_eur(res_q),
-        )
-
-    if detalles:
-        # Fila en blanco de separación
-        t_det.add_row("", "", "", "", "", "")
-        # Fila de totales por columnas
-        t_det.add_row(
-            "[bold]TOTAL[/bold]",
-            f"[bold]{_fmt_eur(total_base)}[/bold]",
-            f"[bold]{_fmt_eur(total_devengado)}[/bold]",
-            f"[bold]{_fmt_eur(total_base_deducible)}[/bold]",
-            f"[bold]{_fmt_eur(total_deducible)}[/bold]",
-            f"[bold]{_fmt_eur(resultado)}[/bold]",
-        )
-
-    print(t_det)
+    if q == 4 and not solo_programacion:
+        print("[cyan]ℹ️  El 4º trimestre regulariza todo el ejercicio.[/cyan]")
 
 
 @app.command("irpf")
@@ -664,7 +626,7 @@ def ver_irpf(
         typer.secho("Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
-    r = irpf_modelo130(year, q)
+    r = irpf_snapshot_acumulado(year, q, solo_programacion=False)
 
     def eur(v: _Decimal) -> str:
         return format(v.quantize(_Decimal("0.01")), "f")
@@ -674,108 +636,6 @@ def ver_irpf(
     t.add_column("Importe (EUR)", justify="right")
     t.add_row("Retenciones soportadas", eur(r["retenciones"]))
     print(t)
-
-@app.command("m130")
-def calcular_m130(
-    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q3"),
-    solo_programacion: bool = typer.Option(
-        False,
-        "--solo-programacion",
-        help="Modo análisis: solo actividad programación (NO oficial)",
-    ),
-):
-    """
-    Modelo 130 – Pago fraccionado IRPF (reproducción oficial, apartado I).
-
-    Por defecto reproduce EXACTAMENTE el modelo presentado a la AEAT.
-    Con --solo-programacion calcula solo la actividad sin retención (análisis).
-    """
-    from decimal import Decimal as _Decimal
-
-    # ─────────────────────────────────────────────
-    # Validación periodo
-    # ─────────────────────────────────────────────
-    try:
-        year = int(periodo[:4])
-        q = int(periodo[-1])
-        if q not in (1, 2, 3, 4):
-            raise ValueError
-    except ValueError:
-        typer.secho(
-            "Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(code=1)
-
-    # ─────────────────────────────────────────────
-    # Cálculo fiscal (SERVICIO)
-    # ─────────────────────────────────────────────
-    r = irpf_modelo130(year, q, solo_programacion=solo_programacion)
-
-    def eur(v: _Decimal) -> str:
-        return format(v.quantize(_Decimal("0.01")), "f")
-
-    # ─────────────────────────────────────────────
-    # Tabla principal – Casillas modelo 130
-    # ─────────────────────────────────────────────
-    title = f"Modelo 130 – IRPF ({periodo})"
-    if solo_programacion:
-        title += " [ANÁLISIS SOLO PROGRAMACIÓN]"
-
-    t = Table(title=title)
-    t.add_column("Casilla", justify="right")
-    t.add_column("Concepto")
-    t.add_column("Importe (€)", justify="right")
-
-    t.add_row("01", "Ingresos computables", eur(r["ingresos"]))
-    t.add_row(
-        "02",
-        "Gastos deducibles + Cuotas SS",
-        f"-{eur(r['gastos'])}",
-    )
-    t.add_row("03", "Rendimiento neto", eur(r["rendimiento"]))
-    t.add_row("04", "20 % del rendimiento", eur(r["base_20"]))
-    t.add_row(
-        "06",
-        "Retenciones soportadas",
-        f"-{eur(r['retenciones'])}",
-    )
-    t.add_row(
-        "07",
-        "[bold]Resultado pago fraccionado[/bold]",
-        f"[bold]{eur(r['resultado'])}[/bold]",
-    )
-
-    print(t)
-
-    # ─────────────────────────────────────────────
-    # Tabla detalle (informativa, no oficial)
-    # ─────────────────────────────────────────────
-    d = r.get("detalle", {})
-    if d:
-        td = Table(title="Detalle informativo")
-        td.add_column("Concepto")
-        td.add_column("Importe (€)", justify="right")
-
-        td.add_row("Gastos deducibles (sin cuotas SS)", eur(d["gastos_sin_cuotas"]))
-        td.add_row("Cuotas de autónomos (SS)", eur(d["cuotas_ss"]))
-
-        print(td)
-
-    # ─────────────────────────────────────────────
-    # Mensaje final
-    # ─────────────────────────────────────────────
-    if solo_programacion:
-        print(
-            "[yellow]⚠️  Modo análisis: este resultado NO es el modelo oficial presentado a la AEAT.[/yellow]"
-        )
-    else:
-        if r["resultado"] > 0:
-            print("[green]Resultado: importe a ingresar[/green]")
-        elif r["resultado"] < 0:
-            print("[yellow]Resultado: negativo (a compensar)[/yellow]")
-        else:
-            print("[blue]Resultado: 0[/blue]")
 
 
 @app.command("cuotas")
