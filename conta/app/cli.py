@@ -157,6 +157,7 @@ def add_gasto(
 @app.command("facturas")
 def list_facturas(
     periodo: str = typer.Argument(None, help="Periodo en formato YYYYQ#, ej: 2025Q4"),
+    year: int | None = typer.Option(None, "--year", help="Año completo, ej: 2025"),
     actividad: Actividad | None = typer.Option(None, help="Filtrar por actividad"),
     limit: int = typer.Option(200, help="Máximo de facturas a mostrar"),
     desc: bool = typer.Option(False, help="Orden descendente"),
@@ -165,9 +166,12 @@ def list_facturas(
     from sqlmodel import select
     from decimal import Decimal as _Decimal
 
+    start_date: date | None = None
+    end_date: date | None = None
+
     if periodo:
         try:
-            year = int(periodo[:4])
+            year_p = int(periodo[:4])
             q = int(periodo[-1])
             if q not in (1, 2, 3, 4):
                 raise ValueError
@@ -179,14 +183,27 @@ def list_facturas(
             raise typer.Exit(code=1)
 
         start_month = 1 + (q - 1) * 3
-        start_date = date(year, start_month, 1)
+        start_date = date(year_p, start_month, 1)
         if q == 4:
-            end_date = date(year + 1, 1, 1)
+            end_date = date(year_p + 1, 1, 1)
         else:
-            end_date = date(year, start_month + 3, 1)
+            end_date = date(year_p, start_month + 3, 1)
+
+    if year is not None:
+        if periodo:
+            typer.secho(
+                "No puedes combinar periodo y --year en la misma llamada",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+        if year < 1900 or year > 2100:
+            typer.secho("Año inválido. Usa un año tipo 2025", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        start_date = date(year, 1, 1)
+        end_date = date(year + 1, 1, 1)
 
     stmt = select(FacturaEmitida)
-    if periodo:
+    if start_date is not None and end_date is not None:
         stmt = stmt.where(
             (FacturaEmitida.fecha_emision >= start_date)
             & (FacturaEmitida.fecha_emision < end_date)
@@ -468,9 +485,65 @@ def pagar_m130(
     )
 
 
+@app.command("m130")
+def calcular_m130(
+    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q4"),
+    solo_programacion: bool = typer.Option(
+        False,
+        "--solo-programacion",
+        help="Modo análisis (NO oficial)",
+    ),
+):
+    """
+    Modelo 130 – IRPF (apartado I).
+    Reproducción fiel del modelo AEAT (acumulado).
+    """
+    from decimal import Decimal
+    from rich.table import Table
+
+    year = int(periodo[:4])
+    q = int(periodo[-1])
+
+    r = irpf_snapshot_acumulado(year, q, solo_programacion)
+
+    def eur(v: Decimal) -> str:
+        return format(v.quantize(Decimal("0.01")), "f")
+
+    t = Table(title=f"Modelo 130 – IRPF ({periodo})")
+    t.add_column("Casilla", justify="right")
+    t.add_column("Concepto")
+    t.add_column("Importe (€)", justify="right")
+
+    t.add_row("01", "Ingresos computables (acumulado)", eur(r["ingresos"]))
+    t.add_row("02", "Gastos deducibles + Cuotas SS", f"-{eur(r['gastos'])}")
+    t.add_row("03", "Rendimiento neto", eur(r["rendimiento"]))
+    t.add_row("04", "20 % del rendimiento", eur(r["base_20"]))
+    t.add_row("05", "Pagos fraccionados anteriores", f"-{eur(r['pagos_previos'])}")
+    t.add_row("06", "Retenciones soportadas", f"-{eur(r['retenciones'])}")
+    t.add_row(
+        "07",
+        "[bold]Resultado pago fraccionado[/bold]",
+        f"[bold]{eur(r['resultado'])}[/bold]",
+    )
+
+    print(t)
+
+    d = r["detalle"]
+    td = Table(title="Detalle informativo (no oficial)")
+    td.add_column("Concepto")
+    td.add_column("Importe (€)", justify="right")
+    td.add_row("Gastos sin SS", eur(d["gastos_sin_cuotas"]))
+    td.add_row("Cuotas autónomos", eur(d["cuotas_ss"]))
+    print(td)
+
+    if q == 4 and not solo_programacion:
+        print("[cyan]ℹ️  El 4º trimestre regulariza todo el ejercicio.[/cyan]")    
+
+
 @app.command("gastos")
 def list_gastos(
     periodo: str = typer.Argument(None, help="Periodo en formato YYYYQ#, ej: 2025Q4"),
+    year: int | None = typer.Option(None, "--year", help="Año completo, ej: 2025"),
     limit: int = typer.Option(200, help="Máximo de gastos a mostrar"),
     desc: bool = typer.Option(False, help="Orden descendente"),
 ):
@@ -478,9 +551,12 @@ def list_gastos(
     from sqlmodel import select
     from decimal import Decimal as _Decimal
 
+    start_date: date | None = None
+    end_date: date | None = None
+
     if periodo:
         try:
-            year = int(periodo[:4])
+            year_p = int(periodo[:4])
             q = int(periodo[-1])
             if q not in (1, 2, 3, 4):
                 raise ValueError
@@ -492,14 +568,27 @@ def list_gastos(
             raise typer.Exit(code=1)
 
         start_month = 1 + (q - 1) * 3
-        start_date = date(year, start_month, 1)
+        start_date = date(year_p, start_month, 1)
         if q == 4:
-            end_date = date(year + 1, 1, 1)
+            end_date = date(year_p + 1, 1, 1)
         else:
-            end_date = date(year, start_month + 3, 1)
+            end_date = date(year_p, start_month + 3, 1)
+
+    if year is not None:
+        if periodo:
+            typer.secho(
+                "No puedes combinar periodo y --year en la misma llamada",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+        if year < 1900 or year > 2100:
+            typer.secho("Año inválido. Usa un año tipo 2025", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        start_date = date(year, 1, 1)
+        end_date = date(year + 1, 1, 1)
 
     stmt = select(GastoDeducible)
-    if periodo:
+    if start_date is not None and end_date is not None:
         stmt = stmt.where((GastoDeducible.fecha >= start_date) & (GastoDeducible.fecha < end_date))
     stmt = stmt.order_by(
         GastoDeducible.fecha.desc() if desc else GastoDeducible.fecha,
@@ -577,29 +666,83 @@ def list_gastos(
 
 @app.command("iva")
 def calcular_iva(
-    periodo: str = typer.Argument(..., help="Periodo en formato YYYYQ#, ej: 2025Q3")
+    periodo: str | None = typer.Argument(
+        None, help="Periodo en formato YYYYQ#, ej: 2025Q3"
+    ),
+    year: int | None = typer.Option(
+        None,
+        "--year",
+        help="Año completo, ej: 2025. Suma los 4 trimestres",
+    ),
 ):
-    """
-    Calcula y muestra el IVA a pagar de un trimestre (modelo 303).
-    """
+    """Calcula y muestra el IVA a pagar de un trimestre o año (modelo 303)."""
     from decimal import Decimal as _Decimal
 
-    # Parse periodo
-    try:
-        year = int(periodo[:4])
-        q = int(periodo[-1])
-        if q not in (1, 2, 3, 4):
-            raise ValueError
-    except ValueError:
-        typer.secho("Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3", fg=typer.colors.RED)
+    if (periodo is None) and (year is None):
+        typer.secho(
+            "Debes indicar un periodo YYYYQ# o un --year YYYY",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1)
 
-    res = iva_trimestre(year, q)
+    if (periodo is not None) and (year is not None):
+        typer.secho(
+            "No puedes combinar periodo y --year en la misma llamada",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    # Cálculo trimestral
+    if periodo is not None:
+        try:
+            year_p = int(periodo[:4])
+            q = int(periodo[-1])
+            if q not in (1, 2, 3, 4):
+                raise ValueError
+        except ValueError:
+            typer.secho(
+                "Periodo inválido. Usa formato YYYYQ#, ej: 2025Q3",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+
+        res = iva_trimestre(year_p, q)
+        titulo = f"IVA – Modelo 303 ({periodo})"
+    else:
+        # Cálculo anual sumando los 4 trimestres
+        if year is None or year < 1900 or year > 2100:
+            typer.secho(
+                "Año inválido. Usa un año tipo 2025",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+
+        base_dev = _Decimal("0.00")
+        base_ded = _Decimal("0.00")
+        iva_dev = _Decimal("0.00")
+        iva_ded = _Decimal("0.00")
+
+        for q in (1, 2, 3, 4):
+            r_q = iva_trimestre(year, q)
+            base_dev += r_q["base_devengado"]
+            base_ded += r_q["base_deducible"]
+            iva_dev += r_q["iva_devengado"]
+            iva_ded += r_q["iva_deducible"]
+
+        resultado = iva_dev - iva_ded
+        res = {
+            "base_devengado": base_dev,
+            "base_deducible": base_ded,
+            "iva_devengado": iva_dev,
+            "iva_deducible": iva_ded,
+            "resultado": resultado,
+        }
+        titulo = f"IVA – Modelo 303 ({year} año completo)"
 
     def _fmt_eur(v: _Decimal) -> str:
         return format(v.quantize(_Decimal("0.01")), "f")
 
-    t = Table(title=f"IVA – Modelo 303 ({periodo})")
+    t = Table(title=titulo)
     t.add_column("Concepto")
     t.add_column("Base (EUR)", justify="right")
     t.add_column("Cuota (EUR)", justify="right")
@@ -631,60 +774,6 @@ def calcular_iva(
     else:
         print("[blue]Resultado: IVA neutro[/blue]")
 
-
-@app.command("m130")
-def calcular_m130(
-    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q4"),
-    solo_programacion: bool = typer.Option(
-        False,
-        "--solo-programacion",
-        help="Modo análisis (NO oficial)",
-    ),
-):
-    """
-    Modelo 130 – IRPF (apartado I).
-    Reproducción fiel del modelo AEAT (acumulado).
-    """
-    from decimal import Decimal
-    from rich.table import Table
-
-    year = int(periodo[:4])
-    q = int(periodo[-1])
-
-    r = irpf_snapshot_acumulado(year, q, solo_programacion)
-
-    def eur(v: Decimal) -> str:
-        return format(v.quantize(Decimal("0.01")), "f")
-
-    t = Table(title=f"Modelo 130 – IRPF ({periodo})")
-    t.add_column("Casilla", justify="right")
-    t.add_column("Concepto")
-    t.add_column("Importe (€)", justify="right")
-
-    t.add_row("01", "Ingresos computables (acumulado)", eur(r["ingresos"]))
-    t.add_row("02", "Gastos deducibles + Cuotas SS", f"-{eur(r['gastos'])}")
-    t.add_row("03", "Rendimiento neto", eur(r["rendimiento"]))
-    t.add_row("04", "20 % del rendimiento", eur(r["base_20"]))
-    t.add_row("05", "Pagos fraccionados anteriores", f"-{eur(r['pagos_previos'])}")
-    t.add_row("06", "Retenciones soportadas", f"-{eur(r['retenciones'])}")
-    t.add_row(
-        "07",
-        "[bold]Resultado pago fraccionado[/bold]",
-        f"[bold]{eur(r['resultado'])}[/bold]",
-    )
-
-    print(t)
-
-    d = r["detalle"]
-    td = Table(title="Detalle informativo (no oficial)")
-    td.add_column("Concepto")
-    td.add_column("Importe (€)", justify="right")
-    td.add_row("Gastos sin SS", eur(d["gastos_sin_cuotas"]))
-    td.add_row("Cuotas autónomos", eur(d["cuotas_ss"]))
-    print(td)
-
-    if q == 4 and not solo_programacion:
-        print("[cyan]ℹ️  El 4º trimestre regulariza todo el ejercicio.[/cyan]")
 
 
 @app.command("irpf")
@@ -718,15 +807,19 @@ def ver_irpf(
 @app.command("cuotas")
 def list_cuotas(
     periodo: str = typer.Argument(None, help="Periodo en formato YYYYQ#, ej: 2025Q3"),
+    year: int | None = typer.Option(None, "--year", help="Año completo, ej: 2025"),
 ):
     """Lista cuotas de autónomos."""
     from sqlmodel import select
     from rich.table import Table
     from decimal import Decimal as _Decimal
 
+    start_date: date | None = None
+    end_date: date | None = None
+
     if periodo:
         try:
-            year = int(periodo[:4])
+            year_p = int(periodo[:4])
             q = int(periodo[-1])
             if q not in (1, 2, 3, 4):
                 raise ValueError
@@ -738,14 +831,27 @@ def list_cuotas(
             raise typer.Exit(code=1)
 
         start_month = 1 + (q - 1) * 3
-        start_date = date(year, start_month, 1)
+        start_date = date(year_p, start_month, 1)
         if q == 4:
-            end_date = date(year + 1, 1, 1)
+            end_date = date(year_p + 1, 1, 1)
         else:
-            end_date = date(year, start_month + 3, 1)
+            end_date = date(year_p, start_month + 3, 1)
+
+    if year is not None:
+        if periodo:
+            typer.secho(
+                "No puedes combinar periodo y --year en la misma llamada",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+        if year < 1900 or year > 2100:
+            typer.secho("Año inválido. Usa un año tipo 2025", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        start_date = date(year, 1, 1)
+        end_date = date(year + 1, 1, 1)
 
     stmt = select(PagoAutonomo)
-    if periodo:
+    if start_date is not None and end_date is not None:
         stmt = stmt.where(
             (PagoAutonomo.fecha >= start_date) & (PagoAutonomo.fecha < end_date)
         )
