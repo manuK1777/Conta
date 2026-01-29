@@ -3,7 +3,9 @@ from rich import print
 from rich.table import Table
 from decimal import Decimal
 from datetime import date, datetime
-from .db import init_db, get_session
+from pathlib import Path
+import shutil
+from .db import init_db, get_session, DB_PATH
 from .models import (
     FacturaEmitida,
     GastoDeducible,
@@ -34,6 +36,32 @@ def _parse_fecha_cli(v: str) -> date:
 def init():
     """Crea la base de datos y tablas."""
     init_db(); print("[green]Base de datos inicializada[/green]")
+
+
+@app.command("backup-db")
+def backup_db(
+    dest_dir: str = typer.Option(
+        "backups",
+        "--dir",
+        help="Carpeta destino del backup (por defecto: ./backups)",
+    ),
+):
+    """Crea una copia de seguridad de la base de datos SQLite."""
+    src = DB_PATH
+    src_path = Path(src)
+
+    if not src_path.exists():
+        typer.secho(f"No se encontró la base de datos en {src}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    dest_dir_path = Path(dest_dir)
+    dest_dir_path.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M")
+    dest_path = dest_dir_path / f"conta-{timestamp}.db"
+
+    shutil.copy2(src_path, dest_path)
+    typer.secho(f"Backup creado en {dest_path}", fg=typer.colors.GREEN)
 
 
 @app.command("emite")
