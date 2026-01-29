@@ -775,6 +775,99 @@ def calcular_iva(
         print("[blue]Resultado: IVA neutro[/blue]")
 
 
+@app.command("iva390")
+def calcular_iva390(
+    anio: int = typer.Argument(..., help="Año completo, ej: 2025"),
+):
+    """Resumen anual de IVA – Modelo 390 para un año."""
+    from decimal import Decimal as _Decimal
+
+    if anio < 1900 or anio > 2100:
+        typer.secho("Año inválido. Usa un año tipo 2025", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    total_base_dev = _Decimal("0.00")
+    total_base_ded = _Decimal("0.00")
+    total_dev = _Decimal("0.00")
+    total_ded = _Decimal("0.00")
+    detalles: list[tuple[str, _Decimal, _Decimal, _Decimal, _Decimal, _Decimal]] = []
+
+    # Suma los cuatro trimestres del año y guarda detalle
+    for q in (1, 2, 3, 4):
+        res_q = iva_trimestre(anio, q)
+        base_dev_q = res_q["base_devengado"]
+        base_ded_q = res_q["base_deducible"]
+        iva_dev_q = res_q["iva_devengado"]
+        iva_ded_q = res_q["iva_deducible"]
+        resultado_q = res_q["resultado"]
+
+        total_base_dev += base_dev_q
+        total_base_ded += base_ded_q
+        total_dev += iva_dev_q
+        total_ded += iva_ded_q
+
+        detalles.append(
+            (
+                f"{anio}Q{q}",
+                base_dev_q,
+                base_ded_q,
+                iva_dev_q,
+                iva_ded_q,
+                resultado_q,
+            )
+        )
+
+    resultado_anual = total_dev - total_ded
+
+    def _fmt_eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    # Tabla resumen anual
+    t = Table(title=f"IVA – Modelo 390 ({anio})")
+    t.add_column("Concepto")
+    t.add_column("Importe (EUR)", justify="right")
+
+    t.add_row("IVA devengado (ventas)", _fmt_eur(total_dev))
+    t.add_row("IVA deducible (compras)", _fmt_eur(total_ded))
+    t.add_row("", "")
+    t.add_row("[bold]Resultado[/bold]", f"[bold]{_fmt_eur(resultado_anual)}[/bold]")
+
+    print(t)
+
+    # Tabla de detalle por trimestre
+    t_det = Table(title=f"Detalle trimestres IVA ({anio})")
+    t_det.add_column("Periodo")
+    t_det.add_column("Base devengada (EUR)", justify="right")
+    t_det.add_column("IVA devengado (EUR)", justify="right")
+    t_det.add_column("IVA deducible Base (EUR)", justify="right")
+    t_det.add_column("IVA deducible (EUR)", justify="right")
+    t_det.add_column("Resultado (EUR)", justify="right")
+
+    for periodo, base_dev_q, base_ded_q, iva_dev_q, iva_ded_q, res_q in detalles:
+        t_det.add_row(
+            periodo,
+            _fmt_eur(base_dev_q),
+            _fmt_eur(iva_dev_q),
+            _fmt_eur(base_ded_q),
+            _fmt_eur(iva_ded_q),
+            _fmt_eur(res_q),
+        )
+
+    if detalles:
+        # Fila en blanco de separación
+        t_det.add_row("", "", "", "", "", "")
+        # Fila de totales por columnas
+        t_det.add_row(
+            "[bold]TOTAL[/bold]",
+            f"[bold]{_fmt_eur(total_base_dev)}[/bold]",
+            f"[bold]{_fmt_eur(total_dev)}[/bold]",
+            f"[bold]{_fmt_eur(total_base_ded)}[/bold]",
+            f"[bold]{_fmt_eur(total_ded)}[/bold]",
+            f"[bold]{_fmt_eur(resultado_anual)}[/bold]",
+        )
+
+    print(t_det)
+
 
 @app.command("irpf")
 def ver_irpf(
