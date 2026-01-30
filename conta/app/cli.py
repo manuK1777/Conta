@@ -186,6 +186,7 @@ def add_gasto(
 def list_facturas(
     periodo: str = typer.Argument(None, help="Periodo en formato YYYYQ#, ej: 2025Q4"),
     year: int | None = typer.Option(None, "--year", help="Año completo, ej: 2025"),
+    cliente: str | None = typer.Option(None, "--cliente", help="Filtrar por nombre de cliente (substring, sin mayúsculas/minúsculas)"),
     actividad: Actividad | None = typer.Option(None, help="Filtrar por actividad"),
     limit: int = typer.Option(200, help="Máximo de facturas a mostrar"),
     desc: bool = typer.Option(False, help="Orden descendente"),
@@ -236,6 +237,10 @@ def list_facturas(
             (FacturaEmitida.fecha_emision >= start_date)
             & (FacturaEmitida.fecha_emision < end_date)
         )
+    if cliente:
+        # Case-insensitive substring match on cliente_nombre
+        pattern = f"%{cliente}%"
+        stmt = stmt.where(FacturaEmitida.cliente_nombre.ilike(pattern))
     if actividad is not None:
         stmt = stmt.where(FacturaEmitida.actividad == actividad)
     stmt = stmt.order_by(
