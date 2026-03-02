@@ -16,6 +16,7 @@ class FacturaIn(BaseModel):
     actividad: Actividad
     notas: str | None = None
     archivo_pdf_path: str | None = None
+    estado_cobro: str = Field(default="Pendiente")
 
 
 class GastoIn(BaseModel):

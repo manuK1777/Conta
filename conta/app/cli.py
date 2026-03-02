@@ -265,6 +265,7 @@ def list_facturas(
     t.add_column("IRPF (EUR)", justify="right")
     t.add_column("Percibido (EUR)", justify="right")
     t.add_column("TOTAL (EUR)", justify="right")
+    t.add_column("Estado factura")
     t.add_column("Actividad")
 
     def _fmt_eur(v: _Decimal) -> str:
@@ -292,8 +293,10 @@ def list_facturas(
         total_percibido += row_percibido
         total_total += row_total
 
-        # Estado column: free-text placeholder from f.estado
-        estado = getattr(f, "estado", None) or ""
+        # Estado (IVA): free-text from f.estado
+        estado_iva = getattr(f, "estado", None) or ""
+        # Estado (cobro): free-text from f.estado_cobro (default "Pendiente")
+        estado_cobro = getattr(f, "estado_cobro", None) or ""
 
         t.add_row(
             str(f.id or ""),
@@ -303,16 +306,17 @@ def list_facturas(
             f.cliente_nombre,
             _fmt_eur(f.base_eur),
             _fmt_eur(f.cuota_iva),
-            estado,
+            estado_iva,
             _fmt_eur(f.ret_irpf_importe),
             _fmt_eur(row_percibido),
             _fmt_eur(row_total),
+            estado_cobro,
             str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
         )
 
     if facturas:
         # Fila en blanco de separación
-        t.add_row(*([""] * 12))
+        t.add_row(*([""] * 13))
         # Fila de totales (Base, IVA y TOTAL)
         t.add_row(
             "",
@@ -322,25 +326,26 @@ def list_facturas(
             "[bold]TOTAL[/bold]",
             f"[bold]{_fmt_eur(total_base)}[/bold]",
             f"[bold]{_fmt_eur(total_iva)}[/bold]",
-            "",  # Estado (not applicable to totals)
+            "",  # Estado (IVA) no aplica en totales
             f"[bold]{_fmt_eur(total_irpf)}[/bold]",
             f"[bold]{_fmt_eur(total_percibido)}[/bold]",
             f"[bold]{_fmt_eur(total_total)}[/bold]",
+            "",  # Estado (cobro) no aplica en totales
             "",
         )
 
     print(t)
 
 
-@app.command("set-estado")
-def set_estado(
+@app.command("set-estado-iva")
+def set_estado_iva(
     estado: str = typer.Argument(..., help="New status text, e.g. 'Pagado'"),
     id: int | None = typer.Option(None, "--id", help="Invoice ID to update"),
     numero: str | None = typer.Option(None, "--numero", help="Invoice number to update"),
     periodo: str | None = typer.Option(None, "--periodo", help="Quarter YYYYQ#, e.g. 2025Q1"),
     year: int | None = typer.Option(None, "--year", help="Full year, e.g. 2025"),
 ):
-    """Establece el texto de 'estado' para una factura o para un periodo/año completo."""
+    """Establece el texto de 'estado (IVA)' para una factura o para un periodo/año completo."""
     from sqlmodel import select
 
     scope_flags = [id is not None, numero is not None, periodo is not None, year is not None]
@@ -412,7 +417,92 @@ def set_estado(
         s.commit()
 
         typer.secho(
-            f"Updated estado to '{estado}' for {len(facturas)} invoice(s) ({ident_desc})",
+            f"Updated estado (IVA) to '{estado}' for {len(facturas)} invoice(s) ({ident_desc})",
+            fg=typer.colors.GREEN,
+        )
+
+
+@app.command("set-estado")
+def set_estado(
+    estado: str = typer.Argument(..., help="Nuevo estado de cobro, p.ej. 'Cobrado'"),
+    id: int | None = typer.Option(None, "--id", help="ID de la factura a actualizar"),
+    numero: str | None = typer.Option(None, "--numero", help="Número de factura a actualizar"),
+    periodo: str | None = typer.Option(None, "--periodo", help="Trimestre YYYYQ#, ej: 2025Q1"),
+    year: int | None = typer.Option(None, "--year", help="Año completo, ej: 2025"),
+):
+    """Establece el estado de cobro para una factura o para un periodo/año completo."""
+    from sqlmodel import select
+
+    scope_flags = [id is not None, numero is not None, periodo is not None, year is not None]
+    if sum(1 for f in scope_flags if f) != 1:
+        typer.secho(
+            "You must provide exactly one of --id, --numero, --periodo or --year",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+    with get_session() as s:
+        stmt = select(FacturaEmitida)
+
+        if id is not None:
+            stmt = stmt.where(FacturaEmitida.id == id)
+            facturas = [s.exec(stmt).first()]
+            facturas = [f for f in facturas if f is not None]
+            ident_desc = f"id={id}"
+        elif numero is not None:
+            stmt = stmt.where(FacturaEmitida.numero == numero)
+            facturas = [s.exec(stmt).first()]
+            facturas = [f for f in facturas if f is not None]
+            ident_desc = f"numero={numero}"
+        else:
+            start_date: date | None = None
+            end_date: date | None = None
+
+            if periodo is not None:
+                try:
+                    year_p = int(periodo[:4])
+                    q = int(periodo[-1])
+                    if q not in (1, 2, 3, 4):
+                        raise ValueError
+                except ValueError:
+                    typer.secho(
+                        "Periodo inválido. Usa formato YYYYQ#, ej: 2025Q4",
+                        fg=typer.colors.RED,
+                    )
+                    raise typer.Exit(code=1)
+
+                start_month = 1 + (q - 1) * 3
+                start_date = date(year_p, start_month, 1)
+                if q == 4:
+                    end_date = date(year_p + 1, 1, 1)
+                else:
+                    end_date = date(year_p, start_month + 3, 1)
+                ident_desc = periodo
+            else:  # year is not None
+                if year is None or year < 1900 or year > 2100:
+                    typer.secho("Año inválido. Usa un año tipo 2025", fg=typer.colors.RED)
+                    raise typer.Exit(code=1)
+                start_date = date(year, 1, 1)
+                end_date = date(year + 1, 1, 1)
+                ident_desc = str(year)
+
+            stmt = stmt.where(
+                (FacturaEmitida.fecha_emision >= start_date)
+                & (FacturaEmitida.fecha_emision < end_date)
+            )
+            facturas = list(s.exec(stmt).all())
+
+        if not facturas:
+            typer.secho(f"No invoices found for {ident_desc}", fg=typer.colors.YELLOW)
+            raise typer.Exit(code=0)
+
+        for f in facturas:
+            f.estado_cobro = estado
+            s.add(f)
+        s.commit()
+
+        typer.secho(
+            f"Updated estado de cobro to '{estado}' for {len(facturas)} invoice(s) ({ident_desc})",
             fg=typer.colors.GREEN,
         )
 

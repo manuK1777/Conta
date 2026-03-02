@@ -24,6 +24,7 @@ class FacturaEmitida(SQLModel, table=True):
     ret_irpf_pct: Decimal = Decimal("0.00")
     ret_irpf_importe: Decimal = Decimal("0.00")
     estado: str | None = None
+    estado_cobro: str = Field(default="Pendiente")
     actividad: Actividad
     notas: str | None = None
     archivo_pdf_path: str | None = None
