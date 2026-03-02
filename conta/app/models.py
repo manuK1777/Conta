@@ -23,6 +23,7 @@ class FacturaEmitida(SQLModel, table=True):
     cuota_iva: Decimal = Decimal("0.00")
     ret_irpf_pct: Decimal = Decimal("0.00")
     ret_irpf_importe: Decimal = Decimal("0.00")
+    estado: str | None = None
     actividad: Actividad
     notas: str | None = None
     archivo_pdf_path: str | None = None
