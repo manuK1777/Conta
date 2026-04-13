@@ -827,6 +827,7 @@ def list_gastos(
     t.add_column("Afecto (%)", justify="right")
     t.add_column("Base (EUR)", justify="right")
     t.add_column("IVA (EUR)", justify="right")
+    t.add_column("IVA ded.", justify="center")
     t.add_column("TOTAL (EUR)", justify="right")
 
     def _fmt_eur(v: _Decimal) -> str:
@@ -860,12 +861,13 @@ def list_gastos(
             _fmt_pct(g.afecto_pct),
             _fmt_eur(g.base_eur),
             _fmt_eur(g.cuota_iva),
+            "✓" if g.iva_deducible else "[red]✗[/red]",
             _fmt_eur(row_total),
         )
 
     if gastos:
         # Fila en blanco de separación
-        t.add_row(*([""] * 9))
+        t.add_row(*([""] * 10))
         # Fila de totales (Base, IVA y TOTAL)
         t.add_row(
             "",
@@ -876,6 +878,7 @@ def list_gastos(
             "",
             f"[bold]{_fmt_eur(total_base)}[/bold]",
             f"[bold]{_fmt_eur(total_iva)}[/bold]",
+            "",
             f"[bold]{_fmt_eur(total_total)}[/bold]",
         )
 

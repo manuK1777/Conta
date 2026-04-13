@@ -75,9 +75,13 @@ def irpf_snapshot_acumulado(
     ingresos = sum((f.base_eur for f in facturas), Decimal("0"))
 
     gastos_sin_ss = sum(
-        (g.base_eur * g.afecto_pct / Decimal("100") for g in gastos),
-        Decimal("0"),
-    )
+    (
+        (g.base_eur + (Decimal("0") if g.iva_deducible else g.cuota_iva))
+        * g.afecto_pct / Decimal("100")
+        for g in gastos
+    ),
+    Decimal("0"),
+)
 
     cuotas_ss = sum((c.importe_eur for c in cuotas), Decimal("0"))
     total_gastos = gastos_sin_ss + cuotas_ss
