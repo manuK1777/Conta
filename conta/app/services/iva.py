@@ -34,11 +34,12 @@ def iva_trimestre(year: int, q: int):
 
     # Solo consideramos como devengado las facturas con IVA distinto de 0
     em_devengado = [f for f in em if f.cuota_iva != Decimal("0")] 
+    re_deducible = [g for g in re if g.iva_deducible]
 
     devengado = sum((f.cuota_iva for f in em_devengado), Decimal("0"))
-    deducible = sum((g.cuota_iva * g.afecto_pct / Decimal("100") for g in re), Decimal("0"))
+    deducible = sum((g.cuota_iva * g.afecto_pct / Decimal("100") for g in re_deducible), Decimal("0"))
     base_devengado = sum((f.base_eur for f in em_devengado), Decimal("0"))
-    base_deducible = sum((g.base_eur * g.afecto_pct / Decimal("100") for g in re), Decimal("0"))
+    base_deducible = sum((g.base_eur * g.afecto_pct / Decimal("100") for g in re_deducible), Decimal("0"))
 
 
     return {

@@ -40,6 +40,7 @@ class GastoDeducible(SQLModel, table=True):
     cuota_iva: Decimal = Decimal("0.00")
     tipo: str | None = None
     afecto_pct: Decimal = Decimal("100.00")
+    iva_deducible: bool = Field(default=True)
     archivo_pdf_path: str | None = None
 
 

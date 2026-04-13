@@ -28,6 +28,7 @@ class GastoIn(BaseModel):
     afecto_pct: Decimal = Field(default=Decimal("100.00"))
     tipo: str | None = None
     archivo_pdf_path: str | None = None
+    iva_deducible: bool = True
 
 class CuotaAutonomoIn(BaseModel):
     fecha: date

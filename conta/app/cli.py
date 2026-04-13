@@ -124,7 +124,8 @@ def add_gasto(
     iva: str,
     afecto_pct: str = "100.00",
     tipo: str = typer.Option(None),
-    pdf: str = typer.Option(None, help="Ruta del PDF")
+    pdf: str = typer.Option(None, help="Ruta del PDF"),
+    no_iva: bool = typer.Option(False, "--no-iva", help="IVA no deducible (OSS, extracomunitario, etc.)"),      
 ):
     """Añade un gasto deducible."""
 
@@ -161,6 +162,7 @@ def add_gasto(
         afecto_pct=Decimal(afecto_pct),
         tipo=tipo,
         archivo_pdf_path=pdf,
+        iva_deducible=not no_iva,
     )
 
     # Usa el IVA introducido por el usuario como cuota de IVA
@@ -174,6 +176,7 @@ def add_gasto(
         cuota_iva=cuota_iva,
         tipo=g.tipo,
         afecto_pct=g.afecto_pct,
+        iva_deducible=g.iva_deducible,
         archivo_pdf_path=g.archivo_pdf_path,
     )
     with get_session() as s:
