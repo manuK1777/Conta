@@ -6,3 +6,4 @@ fastapi>=0.112
 uvicorn>=0.30
 pandas>=2.2
 python-dotenv>=1.0
+textual>=0.55

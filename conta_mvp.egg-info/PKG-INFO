@@ -13,6 +13,7 @@ Requires-Dist: fastapi>=0.112
 Requires-Dist: uvicorn>=0.30
 Requires-Dist: pandas>=2.2
 Requires-Dist: python-dotenv>=1.0
+Requires-Dist: textual>=0.55
 
 # Conta MVP
 

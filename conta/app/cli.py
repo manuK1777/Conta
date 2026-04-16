@@ -1448,3 +1448,10 @@ def import_facturas(
 
     if dry_run:
         print("\n[yellow]Modo dry-run: no se ha guardado ninguna factura[/yellow]")
+
+
+@app.command("tui")
+def launch_tui() -> None:
+    """Lanza la interfaz TUI interactiva (Textual)."""
+    from .tui.app import run
+    run()
