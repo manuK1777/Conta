@@ -703,6 +703,59 @@ def pagar_m130(
         fg=typer.colors.GREEN,
     )
 
+@app.command("pagos-130")
+def list_pagos_130(
+    year: int | None = typer.Option(None, "--year", help="Filtrar por año, ej: 2026"),
+):
+    """Lista los pagos fraccionados del Modelo 130 registrados."""
+    from decimal import Decimal as _Decimal
+
+    stmt = select(PagoFraccionado130)
+    if year is not None:
+        stmt = stmt.where(PagoFraccionado130.year == year)
+    stmt = stmt.order_by(PagoFraccionado130.year, PagoFraccionado130.quarter)
+
+    with get_session() as s:
+        pagos = list(s.exec(stmt).all())
+
+    if not pagos:
+        typer.secho("No hay pagos registrados.", fg=typer.colors.YELLOW)
+        return
+
+    def eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    t = Table(title="Pagos fraccionados – Modelo 130")
+    t.add_column("ID", justify="right")
+    t.add_column("Periodo")
+    t.add_column("Fecha pago")
+    t.add_column("Resultado (€)", justify="right")
+    t.add_column("Ingresado (€)", justify="right")
+
+    total_ingresado = _Decimal("0.00")
+
+    for p in pagos:
+        periodo = f"{p.year}Q{p.quarter}"
+        resultado_str = eur(p.resultado) if hasattr(p, 'resultado') else "—"
+        t.add_row(
+            str(p.id or ""),
+            periodo,
+            p.fecha_pago.strftime("%d-%m-%Y"),
+            resultado_str,
+            eur(p.importe),
+        )
+        total_ingresado += p.importe
+
+    t.add_row("", "", "", "", "")
+    t.add_row(
+        "",
+        "",
+        "[bold]TOTAL ingresado[/bold]",
+        "",
+        f"[bold]{eur(total_ingresado)}[/bold]",
+    )
+
+    print(t)
 
 @app.command("m130")
 def calcular_m130(
