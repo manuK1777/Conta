@@ -68,7 +68,6 @@ def irpf_snapshot_acumulado(
             select(PagoFraccionado130).where(
                 PagoFraccionado130.year == year,
                 PagoFraccionado130.quarter < q,
-                PagoFraccionado130.importe > 0,
             )
         ).all()
 
@@ -104,7 +103,7 @@ def irpf_snapshot_acumulado(
         ).quantize(TWOPLACES)
 
     pagos_previos_total = sum(
-        (p.importe for p in pagos_previos), Decimal("0")
+        (p.resultado for p in pagos_previos), Decimal("0")
     ).quantize(TWOPLACES)
 
     resultado = (

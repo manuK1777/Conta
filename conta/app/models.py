@@ -56,4 +56,5 @@ class PagoFraccionado130(SQLModel, table=True):
     year: int
     quarter: int
     importe: Decimal
+    resultado: Decimal = Decimal("0.00") 
     fecha_pago: date

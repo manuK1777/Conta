@@ -635,7 +635,8 @@ def add_cuota(
 @app.command("pagar-m130")
 def pagar_m130(
     periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q3"),
-    importe: str = typer.Argument(..., help="Importe ingresado"),
+    importe: str = typer.Argument(..., help="Importe ingresado (0 si resultado negativo)"),
+    resultado: str = typer.Option("0", "--resultado", help="Resultado real del cálculo, puede ser negativo. Ej: --resultado -115.64"),
 ):
     """
     Registra el pago de un Modelo 130 presentado.
@@ -646,7 +647,6 @@ def pagar_m130(
     from sqlmodel import select
 
     def _parse_importe(v: str) -> Decimal:
-        # Permite formato ES con coma decimal (p.ej. 529,32)
         normalized = v.strip().replace(" ", "").replace(",", ".")
         return Decimal(normalized)
 
@@ -662,14 +662,17 @@ def pagar_m130(
     try:
         importe_dec = _parse_importe(importe)
     except Exception:
-        typer.secho(
-            "Importe inválido. Usa formato 123.45 (o 123,45)",
-            fg=typer.colors.RED,
-        )
+        typer.secho("Importe inválido. Usa formato 123.45 (o 123,45)", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    if importe_dec <= 0:
-        typer.secho("El importe debe ser positivo", fg=typer.colors.RED)
+    try:
+        resultado_dec = _parse_importe(resultado)
+    except Exception:
+        typer.secho("Resultado inválido. Usa formato -115.64 (o -115,64)", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if importe_dec < 0:  # ← cambiado de <= a 
+        typer.secho("El importe ingresado no puede ser negativo", fg=typer.colors.RED)
         raise typer.Exit(1)
 
     with get_session() as s:
@@ -681,16 +684,14 @@ def pagar_m130(
         ).first()
 
         if existente:
-            typer.secho(
-                f"Ya existe un pago registrado para {periodo}",
-                fg=typer.colors.RED,
-            )
+            typer.secho(f"Ya existe un pago registrado para {periodo}", fg=typer.colors.RED)
             raise typer.Exit(1)
 
         pago = PagoFraccionado130(
             year=year,
             quarter=q,
             importe=importe_dec.quantize(Decimal("0.01")),
+            resultado=resultado_dec.quantize(Decimal("0.01")),  # ← NUEVO
             fecha_pago=date.today(),
         )
 
@@ -698,7 +699,7 @@ def pagar_m130(
         s.commit()
 
     typer.secho(
-        f"✔ Pago fraccionado 130 registrado: {periodo} → {importe_dec.quantize(Decimal('0.01'))} €",
+        f"✔ Pago fraccionado 130 registrado: {periodo} → ingresado: {importe_dec.quantize(Decimal('0.01'))} € | resultado: {resultado_dec.quantize(Decimal('0.01'))} €",
         fg=typer.colors.GREEN,
     )
 
