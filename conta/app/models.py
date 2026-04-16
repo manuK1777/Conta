@@ -58,3 +58,11 @@ class PagoFraccionado130(SQLModel, table=True):
     importe: Decimal
     resultado: Decimal = Decimal("0.00") 
     fecha_pago: date
+
+class Presentacion303(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    year: int
+    quarter: int
+    fecha_presentacion: date
+    resultado: Decimal
+    importe_pagado: Decimal    

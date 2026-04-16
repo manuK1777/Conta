@@ -63,3 +63,17 @@ class PagoFraccionado130In(BaseModel):
         if v not in (1, 2, 3, 4):
             raise ValueError("El trimestre debe estar entre 1 y 4")
         return v
+
+class Presentacion303In(BaseModel):
+    year: int
+    quarter: int
+    fecha_presentacion: date
+    resultado: Decimal
+    importe_pagado: Decimal
+
+    @field_validator("quarter")
+    @classmethod
+    def quarter_valid(cls, v: int):
+        if v not in (1, 2, 3, 4):
+            raise ValueError("El trimestre debe estar entre 1 y 4")
+        return v        

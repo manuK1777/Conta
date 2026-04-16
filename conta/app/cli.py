@@ -12,6 +12,7 @@ from .models import (
     Actividad,
     PagoAutonomo,
     PagoFraccionado130,
+    Presentacion303,
 )
 from .schemas import FacturaIn, GastoIn, CuotaAutonomoIn
 from sqlmodel import select
@@ -1049,6 +1050,114 @@ def calcular_iva(
     else:
         print("[blue]Resultado: IVA neutro[/blue]")
 
+        
+@app.command("presentar-303")
+def presentar_303(
+    periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2026Q1"),
+    resultado: str = typer.Argument(..., help="Resultado del 303 (positivo = a pagar, negativo = a devolver)"),
+    pagado: str = typer.Option("0", "--pagado", help="Importe realmente ingresado"),
+):
+    """Registra la presentación del Modelo 303 de un trimestre."""
+    from decimal import Decimal
+    from datetime import date
+
+    def _parse(v: str) -> Decimal:
+        return Decimal(v.strip().replace(" ", "").replace(",", "."))
+
+    try:
+        year = int(periodo[:4])
+        q = int(periodo[-1])
+        if q not in (1, 2, 3, 4):
+            raise ValueError
+    except ValueError:
+        typer.secho("Periodo inválido. Usa YYYYQ#", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        resultado_dec = _parse(resultado)
+        pagado_dec = _parse(pagado)
+    except Exception:
+        typer.secho("Importe inválido. Usa formato 123.45 (o 123,45)", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    with get_session() as s:
+        existente = s.exec(
+            select(Presentacion303).where(
+                Presentacion303.year == year,
+                Presentacion303.quarter == q,
+            )
+        ).first()
+
+        if existente:
+            typer.secho(f"Ya existe una presentación del 303 para {periodo}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        p = Presentacion303(
+            year=year,
+            quarter=q,
+            fecha_presentacion=date.today(),
+            resultado=resultado_dec.quantize(Decimal("0.01")),
+            importe_pagado=pagado_dec.quantize(Decimal("0.01")),
+        )
+        s.add(p)
+        s.commit()
+
+    typer.secho(
+        f"✔ 303 registrado: {periodo} → resultado: {resultado_dec.quantize(Decimal('0.01'))} € | pagado: {pagado_dec.quantize(Decimal('0.01'))} €",
+        fg=typer.colors.GREEN,
+    )
+
+
+@app.command("presentaciones-303")
+def list_presentaciones_303(
+    year: int | None = typer.Option(None, "--year", help="Filtrar por año, ej: 2026"),
+):
+    """Lista las presentaciones del Modelo 303 registradas."""
+    from decimal import Decimal as _Decimal
+
+    stmt = select(Presentacion303)
+    if year is not None:
+        stmt = stmt.where(Presentacion303.year == year)
+    stmt = stmt.order_by(Presentacion303.year, Presentacion303.quarter)
+
+    with get_session() as s:
+        presentaciones = list(s.exec(stmt).all())
+
+    if not presentaciones:
+        typer.secho("No hay presentaciones registradas.", fg=typer.colors.YELLOW)
+        return
+
+    def eur(v: _Decimal) -> str:
+        return format(v.quantize(_Decimal("0.01")), "f")
+
+    t = Table(title="Presentaciones – Modelo 303")
+    t.add_column("ID", justify="right")
+    t.add_column("Periodo")
+    t.add_column("Fecha presentación")
+    t.add_column("Resultado (€)", justify="right")
+    t.add_column("Pagado (€)", justify="right")
+
+    total_pagado = _Decimal("0.00")
+
+    for p in presentaciones:
+        t.add_row(
+            str(p.id or ""),
+            f"{p.year}Q{p.quarter}",
+            p.fecha_presentacion.strftime("%d-%m-%Y"),
+            eur(p.resultado),
+            eur(p.importe_pagado),
+        )
+        total_pagado += p.importe_pagado
+
+    t.add_row("", "", "", "", "")
+    t.add_row(
+        "", "",
+        "[bold]TOTAL pagado[/bold]",
+        "",
+        f"[bold]{eur(total_pagado)}[/bold]",
+    )
+
+    print(t)
 
 @app.command("iva390")
 def calcular_iva390(
