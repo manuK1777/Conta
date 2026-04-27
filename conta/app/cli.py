@@ -122,13 +122,13 @@ def add_gasto(
     proveedor: str,
     fecha: str,
     base: str,
-    iva: str,
+    tipo_iva: str = "21.00",
     afecto_pct: str = "100.00",
     tipo: str = typer.Option(None),
     pdf: str = typer.Option(None, help="Ruta del PDF"),
-    no_iva: bool = typer.Option(False, "--no-iva", help="IVA no deducible (OSS, extracomunitario, etc.)"),      
+    no_iva: bool = typer.Option(False, "--no-iva", help="IVA no deducible (OSS, extracomunitario, etc.)"),
 ):
-    """Añade un gasto deducible."""
+    """Añade un gasto deducible. Tipo IVA: 21.00, 10.00, 4.00 o 0.00"""
 
     try:
         fecha_dt = _parse_fecha_cli(fecha)
@@ -141,33 +141,34 @@ def add_gasto(
 
     try:
         base_dec = Decimal(base)
-        iva_dec = Decimal(iva)
+        tipo_iva_dec = Decimal(tipo_iva)
     except Exception:
         typer.secho(
-            "Importes inválidos. Usa formato 123.45 para base e IVA",
+            "Importes inválidos. Usa formato 123.45 para base",
             fg=typer.colors.RED,
         )
         raise typer.Exit(code=1)
 
-    # Calcula el porcentaje de IVA a partir de base e IVA
-    if base_dec == 0:
-        tipo_iva_pct = Decimal("0.00")
-    else:
-        tipo_iva_pct = (iva_dec * Decimal("100")) / base_dec
+    # Validar tipo IVA estándar
+    if tipo_iva_dec not in (Decimal("0.00"), Decimal("4.00"), Decimal("10.00"), Decimal("21.00")):
+        typer.secho(
+            "Tipo IVA debe ser 0.00, 4.00, 10.00 o 21.00",
+            fg=typer.colors.YELLOW,
+        )
 
     g = GastoIn(
         proveedor=proveedor,
         fecha=fecha_dt,
         base_eur=base_dec,
-        tipo_iva=tipo_iva_pct,
+        tipo_iva=tipo_iva_dec,
         afecto_pct=Decimal(afecto_pct),
         tipo=tipo,
         archivo_pdf_path=pdf,
         iva_deducible=not no_iva,
     )
 
-    # Usa el IVA introducido por el usuario como cuota de IVA
-    cuota_iva = iva_dec.quantize(Decimal("0.01"))
+    # Calcula la cuota IVA a partir del tipo nominal
+    cuota_iva = (base_dec * tipo_iva_dec / Decimal("100")).quantize(Decimal("0.01"))
     m = GastoDeducible(
         proveedor=g.proveedor,
         proveedor_nif=g.proveedor_nif,

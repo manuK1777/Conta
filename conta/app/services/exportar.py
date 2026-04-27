@@ -68,10 +68,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         td {
             padding: 4px;
             border-bottom: 1px solid #ecf0f1;
+            white-space: nowrap;
         }
         tr:nth-child(even) { background-color: #f8f9fa; }
         tr:hover { background-color: #e8f4f8; }
-        .numeric { text-align: right; }
+        .numeric { text-align: right; white-space: nowrap; }
+        .center { text-align: center; }
         .total-row {
             font-weight: bold;
             background-color: #ecf0f1 !important;
@@ -168,6 +170,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 def _fmt_eur(v: Decimal) -> str:
     return f"{v:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _fmt_num(v: Decimal) -> str:
+    """Format number with European decimal separator (no currency)."""
+    return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _fmt_date(d: date) -> str:
@@ -316,10 +323,10 @@ def build_gastos_table(gastos: list[GastoDeducible]) -> str:
                 <td>{_fmt_date(g.fecha)}</td>
                 <td>{_quarter(g.fecha)}</td>
                 <td class="numeric">{_fmt_eur(g.base_eur)}</td>
-                <td class="numeric">{_fmt_eur(g.tipo_iva)}%</td>
+                <td class="numeric">{_fmt_num(g.tipo_iva)} %</td>
                 <td class="numeric">{_fmt_eur(g.cuota_iva)}</td>
-                <td class="numeric">{_fmt_eur(g.afecto_pct)}%</td>
-                <td>{iva_ded}</td>
+                <td class="numeric">{_fmt_num(g.afecto_pct)} %</td>
+                <td class="center">{iva_ded}</td>
                 <td>{g.tipo or "—"}</td>
             </tr>
         """)
@@ -346,7 +353,7 @@ def build_gastos_table(gastos: list[GastoDeducible]) -> str:
                 <th class="numeric">IVA %</th>
                 <th class="numeric">IVA €</th>
                 <th class="numeric">Afecto %</th>
-                <th>Deducible 303</th>
+                <th class="center">Deducible 303</th>
                 <th>Tipo</th>
             </tr>
         </thead>
@@ -438,7 +445,7 @@ def build_m130_table(m130: list[PagoFraccionado130]) -> str:
             <tr>
                 <th>Trimestre</th>
                 <th>Fecha Pago</th>
-                <th class="numeric">Importe €</th>
+                <th class="numeric">Ingresado €</th>
                 <th class="numeric">Resultado €</th>
             </tr>
         </thead>
@@ -497,7 +504,6 @@ def build_m303_table(year: int, m303: list[Presentacion303]) -> str:
 
     return f"""
     <h2>Presentaciones Modelo 303 (calculado)</h2>
-    <p class="section-note">IVA calculado por trimestre. Cuando hay presentación, se muestra el importe pagado.</p>
     <table>
         <thead>
             <tr>
