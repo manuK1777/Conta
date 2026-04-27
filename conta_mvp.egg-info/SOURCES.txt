@@ -6,6 +6,7 @@ conta/app/db.py
 conta/app/models.py
 conta/app/schemas.py
 conta/app/services/__init__.py
+conta/app/services/exportar.py
 conta/app/services/irpf.py
 conta/app/services/iva.py
 conta/app/services/libros.py

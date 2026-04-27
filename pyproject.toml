@@ -20,6 +20,7 @@ dependencies = [
 "pandas>=2.2",
 "python-dotenv>=1.0",
 "textual>=0.55",
+"weasyprint>=62.0",
 ]
 
 

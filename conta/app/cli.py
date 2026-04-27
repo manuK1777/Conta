@@ -1455,3 +1455,21 @@ def launch_tui() -> None:
     """Lanza la interfaz TUI interactiva (Textual)."""
     from .tui.app import run
     run()
+
+
+@app.command("export")
+def exportar_pdf(
+    year: int = typer.Argument(..., help="Año a exportar, ej. 2025"),
+    output: str | None = typer.Option(None, "--output", "-o", help="Ruta de salida (opcional, por defecto reports/conta_export_YYYY.pdf)"),
+):
+    """Genera un informe anual en PDF con facturas, gastos, cuotas y resumen fiscal."""
+    from pathlib import Path
+    from .services.exportar import generar_pdf
+
+    output_path = Path(output) if output else None
+    try:
+        result_path = generar_pdf(year, output_path)
+        print(f"[green]✓ PDF generado:[/green] {result_path}")
+    except Exception as e:
+        print(f"[red]✗ Error generando PDF:[/red] {e}")
+        raise typer.Exit(code=1)
