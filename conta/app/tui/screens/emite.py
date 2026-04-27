@@ -87,7 +87,7 @@ class EmiteTab(Widget):
 
         with Widget(classes="form-row"):
             yield Label("IRPF ret. (%):")
-            yield Input("0.00", id="fe-irpf", placeholder="0.00 o 15.00")
+            yield Input("15.00", id="fe-irpf", placeholder="0.00 o 15.00")
 
         with Widget(classes="form-row"):
             yield Label("Actividad:")
@@ -116,7 +116,7 @@ class EmiteTab(Widget):
             self.query_one(f"#{fid}", Input).value = ""
         self.query_one("#fe-base", Input).value = ""
         self.query_one("#fe-tipo-iva", Input).value = "21.00"
-        self.query_one("#fe-irpf", Input).value = "0.00"
+        self.query_one("#fe-irpf", Input).value = "15.00"
         self.query_one("#emite-status", Static).update("")
         self.query_one("#emite-error", Static).update("")
 
