@@ -47,7 +47,17 @@ class ContaApp(App):
         yield Footer()
 
     def action_switch_tab(self, tab_id: str) -> None:
-        self.query_one(TabbedContent).active = tab_id
+        tabs = self.query_one(TabbedContent)
+        tabs.active = tab_id
+
+        # Auto-recargar facturas al entrar en la pestaña
+        if tab_id == "facturas":
+            try:
+                facturas_tab = self.query_one(FacturasTab)
+                facturas_tab.action_reload()
+            except Exception:
+                # Si por alguna razón no existe todavía, simplemente ignoramos
+                pass
 
 
 def run() -> None:
