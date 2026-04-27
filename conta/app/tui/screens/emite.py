@@ -93,7 +93,7 @@ class EmiteTab(Widget):
             yield Label("Actividad:")
             yield Select(
                 [(a.value, a.value) for a in Actividad],
-                value=Actividad.programacion.value,
+                value=Actividad.musica.value,
                 id="fe-actividad",
             )
 
@@ -117,6 +117,7 @@ class EmiteTab(Widget):
         self.query_one("#fe-base", Input).value = ""
         self.query_one("#fe-tipo-iva", Input).value = "21.00"
         self.query_one("#fe-irpf", Input).value = "15.00"
+        self.query_one("#fe-actividad").value = Actividad.musica.value
         self.query_one("#emite-status", Static).update("")
         self.query_one("#emite-error", Static).update("")
 
