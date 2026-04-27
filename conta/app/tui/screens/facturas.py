@@ -3,7 +3,7 @@ from decimal import Decimal
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.widget import Widget
-from textual.widgets import Button, DataTable, Input, Label, Static
+from textual.widgets import Button, DataTable, Input, Label, Select, Static
 
 from ...db import get_session
 from ...models import FacturaEmitida
@@ -50,7 +50,8 @@ class FacturasTab(Widget):
     FacturasTab { height: 1fr; }
     #fact-filter { height: 3; layout: horizontal; padding: 0 1; background: $panel; align: left middle; }
     #fact-filter Label { margin-right: 1; color: $text-muted; }
-    #fact-filter Input { width: 14; margin-right: 2; }
+    #fact-filter Input { width: 10; margin-right: 2; }
+    #fact-filter Select { width: 12; margin-right: 2; }
     #fact-filter Button { margin-left: 1; }
     #fact-edit-bar { height: 3; layout: horizontal; padding: 0 1; background: $panel-darken-1; align: left middle; display: none; }
     #fact-edit-bar Label { margin-right: 1; color: $text-muted; }
@@ -62,6 +63,7 @@ class FacturasTab(Widget):
     def __init__(self) -> None:
         super().__init__()
         self._year: int | None = date.today().year
+        self._quarter: int | None = None  # 1-4 or None for all
         self._cliente: str = ""
         self._facturas: list[FacturaEmitida] = []
         self._selected_id: int | None = None
@@ -70,6 +72,12 @@ class FacturasTab(Widget):
         with Widget(id="fact-filter"):
             yield Label("Año:")
             yield Input(str(self._year or ""), id="inp-year", placeholder="ej. 2025")
+            yield Label("Trimestre:")
+            yield Select(
+                [("T1", "1"), ("T2", "2"), ("T3", "3"), ("T4", "4"), ("Todo", "")],
+                value="",
+                id="sel-quarter",
+            )
             yield Label("Cliente:")
             yield Input("", id="inp-cliente", placeholder="substring")
             yield Button("Filtrar", id="btn-filter", variant="primary")
@@ -96,6 +104,8 @@ class FacturasTab(Widget):
 
         if self._year:
             facturas = [f for f in facturas if f.fecha_emision.year == self._year]
+        if self._quarter:
+            facturas = [f for f in facturas if ((f.fecha_emision.month - 1) // 3) + 1 == self._quarter]
         if self._cliente:
             facturas = [
                 f for f in facturas
@@ -155,6 +165,8 @@ class FacturasTab(Widget):
         if event.button.id == "btn-filter":
             year_raw = self.query_one("#inp-year", Input).value.strip()
             self._year = int(year_raw) if year_raw.isdigit() else None
+            q_val = self.query_one("#sel-quarter", Select).value
+            self._quarter = int(str(q_val)) if q_val else None
             self._cliente = self.query_one("#inp-cliente", Input).value.strip()
             self._load()
 

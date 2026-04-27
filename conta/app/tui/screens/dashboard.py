@@ -123,7 +123,7 @@ class DashboardTab(Widget):
         color: $text-muted;
     }
     #dash-controls Select {
-        width: 10;
+        width: 14;
         margin-right: 2;
     }
     #dash-controls Button {
@@ -154,12 +154,6 @@ class DashboardTab(Widget):
                 value=str(self._year),
                 id="sel-year",
             )
-            yield Label("Trimestre:")
-            yield Sel(
-                [("Q1", "1"), ("Q2", "2"), ("Q3", "3"), ("Q4", "4")],
-                value=str(self._q),
-                id="sel-q",
-            )
             yield Button("Actualizar", id="btn-refresh", variant="primary")
 
         yield self._build_grid()
@@ -179,7 +173,6 @@ class DashboardTab(Widget):
         if event.button.id == "btn-refresh":
             try:
                 self._year = int(str(self.query_one("#sel-year", Select).value))
-                self._q = int(str(self.query_one("#sel-q", Select).value))
             except Exception:
                 return
             self._refresh_cards()

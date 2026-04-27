@@ -3,7 +3,7 @@ from decimal import Decimal
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.widget import Widget
-from textual.widgets import Button, DataTable, Input, Label, Static
+from textual.widgets import Button, DataTable, Input, Label, Select, Static
 
 from ...db import get_session
 from ...models import GastoDeducible
@@ -47,7 +47,8 @@ class GastosTab(Widget):
     GastosTab { height: 1fr; }
     #gasto-filter { height: 3; layout: horizontal; padding: 0 1; background: $panel; align: left middle; }
     #gasto-filter Label { margin-right: 1; color: $text-muted; }
-    #gasto-filter Input { width: 14; margin-right: 2; }
+    #gasto-filter Input { width: 10; margin-right: 2; }
+    #gasto-filter Select { width: 12; margin-right: 2; }
     #gasto-filter Button { margin-left: 1; }
     #gasto-status { height: 1; padding: 0 1; background: $panel; color: $text-muted; }
     """
@@ -55,11 +56,18 @@ class GastosTab(Widget):
     def __init__(self) -> None:
         super().__init__()
         self._year: int | None = date.today().year
+        self._quarter: int | None = None
 
     def compose(self) -> ComposeResult:
         with Widget(id="gasto-filter"):
             yield Label("Año:")
             yield Input(str(self._year or ""), id="inp-gyear", placeholder="ej. 2025")
+            yield Label("Trimestre:")
+            yield Select(
+                [("T1", "1"), ("T2", "2"), ("T3", "3"), ("T4", "4"), ("Todo", "")],
+                value="",
+                id="sel-gquarter",
+            )
             yield Button("Filtrar", id="btn-gfilter", variant="primary")
 
         yield DataTable(id="gasto-table", zebra_stripes=True, cursor_type="row")
@@ -78,6 +86,8 @@ class GastosTab(Widget):
 
         if self._year:
             gastos = [g for g in gastos if g.fecha.year == self._year]
+        if self._quarter:
+            gastos = [g for g in gastos if ((g.fecha.month - 1) // 3) + 1 == self._quarter]
 
         table = self.query_one("#gasto-table", DataTable)
         table.clear()
@@ -111,6 +121,8 @@ class GastosTab(Widget):
         if event.button.id == "btn-gfilter":
             year_raw = self.query_one("#inp-gyear", Input).value.strip()
             self._year = int(year_raw) if year_raw.isdigit() else None
+            q_val = self.query_one("#sel-gquarter", Select).value
+            self._quarter = int(str(q_val)) if q_val else None
             self._load()
 
     def action_reload(self) -> None:
