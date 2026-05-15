@@ -86,6 +86,8 @@ class FacturasTab(Widget):
         with Widget(id="fact-edit-bar"):
             yield Label("Nuevo estado factura:", id="edit-label")
             yield Input("", id="inp-new-estado", placeholder="Cobrado / Pendiente")
+            yield Label("Nuevo estado IVA:", id="edit-iva-label")
+            yield Input("", id="inp-new-estado-iva", placeholder="Pagado / Sin Iva / Pendiente")
             yield Button("Guardar", id="btn-save-estado", variant="success")
             yield Button("Cancelar", id="btn-cancel-estado")
 
@@ -189,26 +191,39 @@ class FacturasTab(Widget):
             return
         f = self._facturas[row_key]
         self._selected_id = f.id
-        inp = self.query_one("#inp-new-estado", Input)
-        inp.value = f.estado_cobro or ""
+        # Pre-fill both fields with current values
+        inp_estado = self.query_one("#inp-new-estado", Input)
+        inp_estado.value = f.estado_cobro or ""
+        inp_estado_iva = self.query_one("#inp-new-estado-iva", Input)
+        inp_estado_iva.value = f.estado or ""
         bar = self.query_one("#fact-edit-bar")
         bar.display = True
-        inp.focus()
+        inp_estado.focus()  # Focus on estado factura by default
 
     def _hide_edit_bar(self) -> None:
         self.query_one("#fact-edit-bar").display = False
         self._selected_id = None
+        # Clear both input fields
+        self.query_one("#inp-new-estado", Input).value = ""
+        self.query_one("#inp-new-estado-iva", Input).value = ""
 
     def _do_save_estado(self) -> None:
         if self._selected_id is None:
             return
+        
         new_estado = self.query_one("#inp-new-estado", Input).value.strip()
+        new_estado_iva = self.query_one("#inp-new-estado-iva", Input).value.strip()
+        
         with get_session() as s:
             f = s.exec(
                 select(FacturaEmitida).where(FacturaEmitida.id == self._selected_id)
             ).first()
             if f:
-                f.estado_cobro = new_estado
+                # Update both fields if they have values
+                if new_estado:
+                    f.estado_cobro = new_estado
+                if new_estado_iva:
+                    f.estado = new_estado_iva
                 s.add(f)
                 s.commit()
         self._hide_edit_bar()
