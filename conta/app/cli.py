@@ -198,7 +198,7 @@ def list_facturas(
 ):
     """Lista facturas emitidas."""
     from sqlmodel import select
-    from decimal import Decimal as _Decimal
+    from decimal import Decimal as _Decimal, ROUND_HALF_UP
 
     start_date: date | None = None
     end_date: date | None = None
@@ -274,7 +274,7 @@ def list_facturas(
     t.add_column("Actividad")
 
     def _fmt_eur(v: _Decimal) -> str:
-        return format(v.quantize(_Decimal("0.01")), "f")
+        return format(v.quantize(_Decimal("0.01"), rounding=ROUND_HALF_UP), "f")
 
     def _fmt_quarter(d: date) -> str:
         q = ((d.month - 1) // 3) + 1
@@ -645,7 +645,7 @@ def pagar_m130(
     Imprescindible para el cálculo correcto de trimestres posteriores.
     """
     from datetime import date
-    from decimal import Decimal
+    from decimal import Decimal, ROUND_HALF_UP
     from sqlmodel import select
 
     def _parse_importe(v: str) -> Decimal:
