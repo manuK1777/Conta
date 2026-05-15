@@ -32,6 +32,7 @@ COLUMNS = [
     ("IVA €", 9),
     ("IRPF €", 9),
     ("TOTAL €", 10),
+    ("Percibido €", 10),
     ("Estado factura", 15),
     ("Estado IVA", 12),
     ("Actividad", 12),
@@ -120,13 +121,16 @@ class FacturasTab(Widget):
         total_iva = Decimal("0")
         total_irpf = Decimal("0")
         total_total = Decimal("0")
+        total_percibido = Decimal("0")
 
         for f in facturas:
             row_total = f.base_eur + f.cuota_iva - f.ret_irpf_importe
+            row_percibido = f.base_eur - f.ret_irpf_importe
             total_base += f.base_eur
             total_iva += f.cuota_iva
             total_irpf += f.ret_irpf_importe
             total_total += row_total
+            total_percibido += row_percibido
             table.add_row(
                 str(f.id or ""),
                 f.numero,
@@ -137,6 +141,7 @@ class FacturasTab(Widget):
                 _fmt(f.cuota_iva),
                 _fmt(f.ret_irpf_importe),
                 _fmt(row_total),
+                _fmt(row_percibido),
                 f.estado_cobro or "",
                 f.estado or "",
                 str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
@@ -152,6 +157,7 @@ class FacturasTab(Widget):
                 _fmt(total_iva),
                 _fmt(total_irpf),
                 _fmt(total_total),
+                _fmt(total_percibido),
                 "", "", "",
             )
 
