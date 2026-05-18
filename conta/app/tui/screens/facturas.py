@@ -100,6 +100,10 @@ class FacturasTab(Widget):
             table.add_column(col_name, width=width)
         self._load()
 
+    def on_show(self) -> None:
+        """Auto-refresh when screen becomes visible."""
+        self._load()
+
     def _load(self) -> None:
         with get_session() as s:
             stmt = select(FacturaEmitida).order_by(FacturaEmitida.fecha_emision)

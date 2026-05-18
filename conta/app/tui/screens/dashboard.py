@@ -190,3 +190,7 @@ class DashboardTab(Widget):
 
         self.mount(grid)
         self.call_after_refresh(_mount_children)
+
+    def on_show(self) -> None:
+        """Auto-refresh when screen becomes visible."""
+        self._refresh_cards()
