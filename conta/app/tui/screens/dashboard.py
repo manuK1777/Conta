@@ -178,18 +178,24 @@ class DashboardTab(Widget):
             self._refresh_cards()
 
     def _refresh_cards(self) -> None:
-        old = self.query_one("#dashboard-grid")
-        old.remove()
-        py, pq = self._prev_q()
-        grid = Widget(id="dashboard-grid")
-
-        async def _mount_children() -> None:
+        async def _do_refresh() -> None:
+            try:
+                grid = self.query_one("#dashboard-grid")
+                # Remove all children
+                for child in list(grid.children):
+                    child.remove()
+                await grid.await_remove()
+            except Exception:
+                pass  # Grid might not exist
+            
+            # Mount new children
+            py, pq = self._prev_q()
+            grid = self.query_one("#dashboard-grid")
             await grid.mount(IVACard(py, pq))
             await grid.mount(IVACard(self._year, self._q))
             await grid.mount(IRPFCard(self._year, self._q))
-
-        self.mount(grid)
-        self.call_after_refresh(_mount_children)
+        
+        self.run_worker(_do_refresh)
 
     def on_show(self) -> None:
         """Auto-refresh when screen becomes visible."""
