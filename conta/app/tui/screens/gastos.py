@@ -119,9 +119,19 @@ class GastosTab(Widget):
                 key=str(g.id),
             )
 
+        if gastos:
+            table.add_row(*[""] * len(COLUMNS))
+            table.add_row(
+                "", "", "", "TOTAL",
+                _fmt(total_base),
+                "",
+                _fmt(total_iva),
+                "", "", "",
+            )
+
         n = len(gastos)
         self.query_one("#gasto-status", Static).update(
-            f"{n} gasto(s) — Base total: {_fmt(total_base)} €  |  IVA total: {_fmt(total_iva)} €"
+            f"{n} gasto(s) — Base total: {_fmt(total_base)} €  |  IVA total: {_fmt(total_iva)} €  |  [d] eliminar  [r] recargar"
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
