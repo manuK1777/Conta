@@ -127,6 +127,7 @@ def add_gasto(
     tipo: str = typer.Option(None),
     pdf: str = typer.Option(None, help="Ruta del PDF"),
     no_iva: bool = typer.Option(False, "--no-iva", help="IVA no deducible (OSS, extracomunitario, etc.)"),
+    cuota_iva_override: str = typer.Option(None, "--cuota-iva", help="Cuota IVA exacta de la factura (override del cálculo automático)"),
 ):
     """Añade un gasto deducible. Tipo IVA: 21.00, 10.00, 4.00 o 0.00"""
 
@@ -167,8 +168,11 @@ def add_gasto(
         iva_deducible=not no_iva,
     )
 
-    # Calcula la cuota IVA a partir del tipo nominal
-    cuota_iva = (base_dec * tipo_iva_dec / Decimal("100")).quantize(Decimal("0.01"))
+    # Usa cuota IVA de la factura si se proporciona, sino calcula
+    if cuota_iva_override is not None:
+        cuota_iva = Decimal(cuota_iva_override).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    else:
+        cuota_iva = (base_dec * tipo_iva_dec / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     m = GastoDeducible(
         proveedor=g.proveedor,
         proveedor_nif=g.proveedor_nif,

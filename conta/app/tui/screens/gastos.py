@@ -41,6 +41,7 @@ class GastosTab(Widget):
 
     BINDINGS = [
         Binding("r", "reload", "Recargar"),
+        Binding("d", "delete_gasto", "Eliminar gasto"),
     ]
 
     DEFAULT_CSS = """
@@ -57,6 +58,7 @@ class GastosTab(Widget):
         super().__init__()
         self._year: int | None = date.today().year
         self._quarter: int | None = None
+        self._gastos: list = []
 
     def compose(self) -> ComposeResult:
         with Widget(id="gasto-filter"):
@@ -93,6 +95,7 @@ class GastosTab(Widget):
         if self._quarter:
             gastos = [g for g in gastos if ((g.fecha.month - 1) // 3) + 1 == self._quarter]
 
+        self._gastos = gastos
         table = self.query_one("#gasto-table", DataTable)
         table.clear()
 
@@ -128,6 +131,24 @@ class GastosTab(Widget):
             q_val = self.query_one("#sel-gquarter", Select).value
             self._quarter = int(str(q_val)) if q_val else None
             self._load()
+
+    def action_delete_gasto(self) -> None:
+        table = self.query_one("#gasto-table", DataTable)
+        row_key = table.cursor_row
+        if row_key is None or row_key >= len(self._gastos):
+            return
+        g = self._gastos[row_key]
+        with get_session() as s:
+            obj = s.exec(
+                select(GastoDeducible).where(GastoDeducible.id == g.id)
+            ).first()
+            if obj:
+                s.delete(obj)
+                s.commit()
+        self.query_one("#gasto-status", Static).update(
+            f"✓ Gasto #{g.id} ({g.proveedor}) eliminado"
+        )
+        self._load()
 
     def action_reload(self) -> None:
         self._load()

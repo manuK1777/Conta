@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import Button, Input, Label, Select, Static
@@ -69,6 +69,10 @@ class GastoFormTab(Widget):
             yield Input("21.00", id="gf-tipo-iva", placeholder="21.00")
 
         with Widget(classes="form-row"):
+            yield Label("Cuota IVA (override):")
+            yield Input("", id="gf-cuota-iva", placeholder="Dejar vacío para cálculo automático")
+
+        with Widget(classes="form-row"):
             yield Label("Afecto (%):")
             yield Input("100.00", id="gf-afecto", placeholder="100.00")
 
@@ -95,7 +99,7 @@ class GastoFormTab(Widget):
         return self.query_one(f"#{field_id}", Input).value.strip()
 
     def _clear(self) -> None:
-        for fid in ["gf-proveedor", "gf-nif", "gf-fecha", "gf-base", "gf-tipo"]:
+        for fid in ["gf-proveedor", "gf-nif", "gf-fecha", "gf-base", "gf-cuota-iva", "gf-tipo"]:
             self.query_one(f"#{fid}", Input).value = ""
         self.query_one("#gf-tipo-iva", Input).value = "21.00"
         self.query_one("#gf-afecto", Input).value = "100.00"
@@ -140,7 +144,14 @@ class GastoFormTab(Widget):
             except InvalidOperation:
                 raise ValueError("Afecto % inválido")
 
-            cuota_iva = (base_eur * tipo_iva / Decimal("100")).quantize(Decimal("0.01"))
+            cuota_iva_raw = self._get("gf-cuota-iva")
+            if cuota_iva_raw:
+                try:
+                    cuota_iva = Decimal(cuota_iva_raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                except InvalidOperation:
+                    raise ValueError(f"Cuota IVA inválida: '{cuota_iva_raw}'")
+            else:
+                cuota_iva = (base_eur * tipo_iva / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             iva_deducible = str(self.query_one("#gf-iva-deducible", Select).value) == "si"
 
             g = GastoDeducible(
