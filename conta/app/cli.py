@@ -42,9 +42,9 @@ def init():
 @app.command("backup-db")
 def backup_db(
     dest_dir: str = typer.Option(
-        "backups",
+        str(Path.home() / "repos/conta/backups"),
         "--dir",
-        help="Carpeta destino del backup (por defecto: ./backups)",
+        help="Carpeta destino del backup (por defecto: ~/repos/conta/backups)",
     ),
 ):
     """Crea una copia de seguridad de la base de datos SQLite."""
