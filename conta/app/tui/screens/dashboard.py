@@ -26,6 +26,17 @@ def _color(v: Decimal) -> str:
     return ""
 
 
+def _quarters_for_year(year: int) -> int:
+    """Number of quarters to show for a year: all 4 once the year is over,
+    otherwise only up to today's quarter."""
+    today = date.today()
+    if year < today.year:
+        return 4
+    if year > today.year:
+        return 0
+    return (today.month - 1) // 3 + 1
+
+
 class KVRow(Widget):
     """One label + value row inside a card."""
 
@@ -72,6 +83,37 @@ class IVACard(Static):
             _fmt(d["resultado"]),
             _color(d["resultado"]),
         )
+
+
+class IVARow(Widget):
+    """Row of per-quarter IVA cards (Q1..Q4, or up to today's quarter for the
+    current year), each in its own bordered box."""
+
+    DEFAULT_CSS = """
+    IVARow {
+        layout: horizontal;
+        height: auto;
+    }
+    IVARow > IVACard {
+        width: 1fr;
+        padding: 1 1;
+        margin-right: 1;
+    }
+    IVARow > IVACard:last-of-type {
+        margin-right: 0;
+    }
+    IVARow .kv-label {
+        width: 15;
+    }
+    """
+
+    def __init__(self, year: int) -> None:
+        super().__init__(id="iva-row")
+        self._year = year
+
+    def compose(self) -> ComposeResult:
+        for q in range(1, _quarters_for_year(self._year) + 1):
+            yield IVACard(self._year, q)
 
 
 class IRPFCard(Static):
@@ -178,11 +220,6 @@ class DashboardTab(Widget):
         self._year = today.year
         self._q = (today.month - 1) // 3 + 1
 
-    def _prev_q(self) -> tuple[int, int]:
-        if self._q == 1:
-            return self._year - 1, 4
-        return self._year, self._q - 1
-
     def compose(self) -> ComposeResult:
         years = [(str(y), str(y)) for y in range(date.today().year, date.today().year - 5, -1)]
 
@@ -200,14 +237,12 @@ class DashboardTab(Widget):
         yield self._build_grid()
 
     def _build_grid(self) -> Widget:
-        py, pq = self._prev_q()
         grid = Widget(id="dashboard-grid")
-        grid.compose = lambda: self._grid_children(py, pq)  # type: ignore[method-assign]
+        grid.compose = self._grid_children  # type: ignore[method-assign]
         return grid
 
-    def _grid_children(self, py: int, pq: int):
-        yield IVACard(py, pq)
-        yield IVACard(self._year, self._q)
+    def _grid_children(self):
+        yield IVARow(self._year)
         yield IRPFCard(self._year, self._q)
         yield CuotasCard(self._year)
 
@@ -223,22 +258,15 @@ class DashboardTab(Widget):
         async def _do_refresh() -> None:
             try:
                 grid = self.query_one("#dashboard-grid")
-                # Remove all children
-                for child in list(grid.children):
-                    child.remove()
-                await grid.await_remove()
             except Exception:
-                pass  # Grid might not exist
-            
-            # Mount new children
-            py, pq = self._prev_q()
-            grid = self.query_one("#dashboard-grid")
-            await grid.mount(IVACard(py, pq))
-            await grid.mount(IVACard(self._year, self._q))
+                return  # Grid might not exist yet
+
+            await grid.remove_children()
+            await grid.mount(IVARow(self._year))
             await grid.mount(IRPFCard(self._year, self._q))
             await grid.mount(CuotasCard(self._year))
-        
-        self.run_worker(_do_refresh)
+
+        self.run_worker(_do_refresh, group="dash-refresh", exclusive=True)
 
     def on_show(self) -> None:
         """Auto-refresh when screen becomes visible."""
