@@ -2,9 +2,14 @@ from datetime import date
 from decimal import Decimal
 from textual.app import ComposeResult
 from textual.reactive import reactive
+from textual.containers import VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Button, Label, Select, Static
 
+from sqlmodel import select as sql_select
+
+from ...db import get_session
+from ...models import PagoAutonomo
 from ...services.iva import iva_trimestre
 from ...services.irpf import irpf_snapshot_acumulado
 
@@ -103,6 +108,42 @@ class IRPFCard(Static):
         )
 
 
+class CuotasCard(Static):
+    """Card showing the year's Cuotas de Autónomos (monthly payments)."""
+
+    def __init__(self, year: int) -> None:
+        super().__init__(id="cuotas-card", classes="card")
+        self._year = year
+
+    def compose(self) -> ComposeResult:
+        start = date(self._year, 1, 1)
+        end = date(self._year, 12, 31)
+        with get_session() as s:
+            cuotas = list(
+                s.exec(
+                    sql_select(PagoAutonomo)
+                    .where(PagoAutonomo.fecha.between(start, end))
+                    .order_by(PagoAutonomo.fecha)
+                ).all()
+            )
+
+        yield Label(f"Cuotas Autónomos {self._year}", classes="card-title")
+
+        if not cuotas:
+            yield Label("Sin cuotas registradas", classes="kv-label")
+            return
+
+        total = Decimal("0")
+        with VerticalScroll(classes="cuotas-scroll"):
+            for c in cuotas:
+                total += c.importe_eur
+                fecha_str = c.fecha.strftime("%d-%m-%Y")
+                label = f"{fecha_str}  {c.concepto or ''}".strip()
+                yield KVRow(label, _fmt(c.importe_eur))
+
+        yield KVRow("Total", _fmt(total), "positive")
+
+
 class DashboardTab(Widget):
     """Dashboard: IVA for current & previous quarter + IRPF."""
 
@@ -168,6 +209,7 @@ class DashboardTab(Widget):
         yield IVACard(py, pq)
         yield IVACard(self._year, self._q)
         yield IRPFCard(self._year, self._q)
+        yield CuotasCard(self._year)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-refresh":
@@ -194,6 +236,7 @@ class DashboardTab(Widget):
             await grid.mount(IVACard(py, pq))
             await grid.mount(IVACard(self._year, self._q))
             await grid.mount(IRPFCard(self._year, self._q))
+            await grid.mount(CuotasCard(self._year))
         
         self.run_worker(_do_refresh)
 
