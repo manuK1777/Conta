@@ -787,17 +787,25 @@ def calcular_m130(
     def eur(v: Decimal) -> str:
         return format(v.quantize(Decimal("0.01")), "f")
 
+    def eur_neg(v: Decimal) -> str:
+        """Como eur(), pero antepone '-' solo si el valor no es cero
+        (evita mostrar '-0.00' cuando la casilla no aplica)."""
+        v = v.quantize(Decimal("0.01"))
+        if v == 0:
+            return eur(v)
+        return f"-{eur(v)}"
+
     t = Table(title=f"Modelo 130 – IRPF ({periodo})")
     t.add_column("Casilla", justify="right")
     t.add_column("Concepto")
     t.add_column("Importe (€)", justify="right")
 
     t.add_row("01", "Ingresos computables (acumulado)", eur(r["ingresos"]))
-    t.add_row("02", "Gastos deducibles + Cuotas SS", f"-{eur(r['gastos'])}")
+    t.add_row("02", "Gastos deducibles + Cuotas SS", eur_neg(r["gastos"]))
     t.add_row("03", "Rendimiento neto", eur(r["rendimiento"]))
     t.add_row("04", "20 % del rendimiento", eur(r["base_20"]))
-    t.add_row("05", "Pagos fraccionados anteriores", f"-{eur(r['pagos_previos'])}")
-    t.add_row("06", "Retenciones soportadas", f"-{eur(r['retenciones'])}")
+    t.add_row("05", "Pagos fraccionados anteriores", eur_neg(r["pagos_previos"]))
+    t.add_row("06", "Retenciones soportadas", eur_neg(r["retenciones"]))
     t.add_row(
         "07",
         "[bold]Resultado pago fraccionado[/bold]",

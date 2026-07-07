@@ -102,8 +102,12 @@ def irpf_snapshot_acumulado(
             Decimal("0"),
         ).quantize(TWOPLACES)
 
+    # Casilla 05: solo se suman los resultados POSITIVOS de trimestres
+    # anteriores del mismo ejercicio. Un resultado negativo (a devolver/sin
+    # ingreso) no se arrastra como crédito -> cuenta como cero.
+    # Ref.: instrucciones modelo 130, casilla 05.
     pagos_previos_total = sum(
-        (p.resultado for p in pagos_previos), Decimal("0")
+        (max(p.resultado, Decimal("0")) for p in pagos_previos), Decimal("0")
     ).quantize(TWOPLACES)
 
     resultado = (
