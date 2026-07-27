@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.screen import ModalScreen
 from textual.widget import Widget
 from rich.text import Text
 from textual.widgets import Button, DataTable, Input, Label, Select, Static
@@ -46,11 +47,48 @@ COLUMNS = [
 ]
 
 
+class ConceptoModal(ModalScreen[None]):
+    """Popup con el concepto completo de una factura."""
+
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cerrar")]
+
+    DEFAULT_CSS = """
+    ConceptoModal { align: center middle; background: $surface 30%; }
+    ConceptoModal > Widget {
+        width: 70; max-width: 90%;
+        height: auto; max-height: 80%;
+        background: $panel; border: thick $primary; padding: 1 2;
+    }
+    ConceptoModal .concepto-header { color: $text-muted; margin-bottom: 1; }
+    ConceptoModal .concepto-body { margin-bottom: 1; }
+    ConceptoModal Button { align-horizontal: right; }
+    """
+
+    def __init__(self, factura: FacturaEmitida) -> None:
+        super().__init__()
+        self._factura = factura
+
+    def compose(self) -> ComposeResult:
+        f = self._factura
+        with Widget():
+            yield Label(f"Factura {f.numero} — {f.cliente_nombre}", classes="concepto-header")
+            yield Static(f.concepto or "(sin concepto)", classes="concepto-body")
+            yield Button("Cerrar", id="btn-cerrar-concepto", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-cerrar-concepto":
+            self.dismiss()
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss()
+
+
 class FacturasTab(Widget):
     """Tabla de facturas emitidas con filtros y edición de estado inline."""
 
     BINDINGS = [
         Binding("e", "edit_estado", "Editar estado"),
+        Binding("c", "ver_concepto", "Ver concepto"),
         Binding("r", "reload", "Recargar"),
     ]
 
@@ -191,7 +229,7 @@ class FacturasTab(Widget):
         n = len(facturas)
         self.query_one("#fact-status", Static).update(
             f"{n} factura(s) — Base total: {_fmt(total_base)} €  |  "
-            f"[e] editar estado  [r] recargar"
+            f"[e] editar estado  [c] ver concepto  [r] recargar"
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -229,6 +267,14 @@ class FacturasTab(Widget):
         bar = self.query_one("#fact-edit-bar")
         bar.display = True
         inp_estado.focus()  # Focus on estado factura by default
+
+    def action_ver_concepto(self) -> None:
+        table = self.query_one("#fact-table", DataTable)
+        row_key = table.cursor_row
+        if row_key is None or row_key >= len(self._facturas):
+            return
+        f = self._facturas[row_key]
+        self.app.push_screen(ConceptoModal(f))
 
     def _start_bulk_edit(self) -> None:
         if not self._year or not self._quarter:
