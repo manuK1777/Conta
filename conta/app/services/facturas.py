@@ -24,3 +24,25 @@ def bulk_set_estado_iva(year: int, q: int, estado: str) -> int:
             s.add(f)
         s.commit()
         return len(facturas)
+
+
+def distinct_clientes() -> list[str]:
+    """Nombres de clientes ya facturados, más recientes primero, para autocompletar el formulario Emite."""
+    with get_session() as s:
+        stmt = select(FacturaEmitida).order_by(FacturaEmitida.fecha_emision.desc())
+        seen: list[str] = []
+        for f in s.exec(stmt).all():
+            if f.cliente_nombre not in seen:
+                seen.append(f.cliente_nombre)
+        return seen
+
+
+def ultima_factura_cliente(nombre: str) -> FacturaEmitida | None:
+    """Última factura de un cliente (por nombre exacto), usada para autorellenar NIF/dirección."""
+    with get_session() as s:
+        stmt = (
+            select(FacturaEmitida)
+            .where(FacturaEmitida.cliente_nombre == nombre)
+            .order_by(FacturaEmitida.fecha_emision.desc())
+        )
+        return s.exec(stmt).first()

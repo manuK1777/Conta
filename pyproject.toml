@@ -29,7 +29,7 @@ where = ["."]
 
 
 [tool.setuptools.package-data]
-"conta.app" = ["../config/rules.yml"]
+"conta.app" = ["../config/rules.yml", "assets/fonts/*.ttf"]
 
 
 [project.scripts]

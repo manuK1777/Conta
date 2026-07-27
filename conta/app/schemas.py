@@ -9,11 +9,13 @@ class FacturaIn(BaseModel):
     fecha_emision: date
     cliente_nombre: str
     cliente_nif: str | None = None
+    cliente_direccion: str | None = None
     pais: str | None = None
     base_eur: Decimal
     tipo_iva: Decimal = Field(default=Decimal("21.00"))
     ret_irpf_pct: Decimal = Field(default=Decimal("0.00"))
     actividad: Actividad
+    concepto: str | None = None
     notas: str | None = None
     archivo_pdf_path: str | None = None
     estado_cobro: str = Field(default="Pendiente")

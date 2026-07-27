@@ -17,6 +17,7 @@ class FacturaEmitida(SQLModel, table=True):
     fecha_emision: date = Field(index=True)
     cliente_nombre: str
     cliente_nif: str | None = None
+    cliente_direccion: str | None = None
     pais: str | None = None
     base_eur: Decimal
     tipo_iva: Decimal = Decimal("21.00")
@@ -26,8 +27,22 @@ class FacturaEmitida(SQLModel, table=True):
     estado: str | None = None
     estado_cobro: str = Field(default="Pendiente")
     actividad: Actividad
+    concepto: str | None = None
     notas: str | None = None
     archivo_pdf_path: str | None = None
+
+
+class EmisorConfig(SQLModel, table=True):
+    """Datos fijos del emisor (yo mismo) impresos en cada factura PDF generada. Fila única, id=1."""
+
+    id: int | None = Field(default=1, primary_key=True)
+    nombre: str
+    direccion_calle: str
+    direccion_cp_ciudad: str
+    nif: str
+    ciudad_emision: str = Field(default="Barcelona")
+    banco_nombre: str
+    banco_iban: str
 
 
 class GastoDeducible(SQLModel, table=True):

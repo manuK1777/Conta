@@ -20,6 +20,8 @@ from .services.iva import iva_trimestre
 from .services.irpf import irpf_snapshot_acumulado
 from .services.libros import export_libros
 from .services.importacion_pdf.importador_factura import importar_factura_pdf
+from .services.emisor import get_emisor_config, set_emisor_config
+from .services.factura_pdf import generar_factura_pdf
 
 
 
@@ -75,7 +77,9 @@ def add_factura(
     ret_irpf_pct: str = "15.00",
     actividad: Actividad = Actividad.musica,
     cliente_nif: str = typer.Option(None),
+    cliente_direccion: str = typer.Option(None, help="Dirección del cliente para la factura PDF"),
     pais: str = typer.Option(None),
+    concepto: str = typer.Option(None, help="Descripción del servicio para la factura PDF"),
     notas: str = typer.Option(None),
     pdf: str = typer.Option(None, help="Ruta del PDF"),
 ):
@@ -95,11 +99,13 @@ def add_factura(
         fecha_emision=fecha_dt,
         cliente_nombre=cliente_nombre,
         cliente_nif=cliente_nif,
+        cliente_direccion=cliente_direccion,
         pais=pais,
         base_eur=Decimal(base),
         tipo_iva=Decimal(tipo_iva),
         ret_irpf_pct=Decimal(ret_irpf_pct),
         actividad=actividad,
+        concepto=concepto,
         notas=notas,
         archivo_pdf_path=pdf,
     )
@@ -115,6 +121,48 @@ def add_factura(
             raise typer.Exit(code=1)
         s.add(m); s.commit()
     print("[green]\u2713 Factura guardada[/green]")
+
+
+@app.command("configurar-emisor")
+def configurar_emisor(
+    nombre: str = typer.Option(..., help="Tu nombre completo"),
+    direccion_calle: str = typer.Option(..., help="Ej. 'Cr/ Viver 14, planta -1 pta. 2'"),
+    direccion_cp_ciudad: str = typer.Option(..., help="Ej. '08035 Barcelona'"),
+    nif: str = typer.Option(..., help="Tu NIF"),
+    banco_nombre: str = typer.Option(..., help="Ej. 'Caixa d`Enginyers'"),
+    banco_iban: str = typer.Option(..., help="Ej. 'ES64 3025 0004 32 1433247130'"),
+    ciudad_emision: str = typer.Option("Barcelona", help="Ciudad usada en la l\u00ednea de fecha de la factura"),
+):
+    """Configura los datos fijos del emisor impresos en cada factura PDF."""
+    set_emisor_config(
+        nombre=nombre,
+        direccion_calle=direccion_calle,
+        direccion_cp_ciudad=direccion_cp_ciudad,
+        nif=nif,
+        banco_nombre=banco_nombre,
+        banco_iban=banco_iban,
+        ciudad_emision=ciudad_emision,
+    )
+    print("[green]\u2713 Datos de emisor guardados[/green]")
+
+
+@app.command("generar-factura-pdf")
+def generar_factura_pdf_cmd(
+    numero: str = typer.Option(..., "--numero", help="N\u00famero de la factura a generar"),
+    output: str = typer.Option(None, "--output", help="Ruta de salida del PDF"),
+):
+    """Genera el PDF de una factura ya guardada."""
+    with get_session() as s:
+        f = s.exec(select(FacturaEmitida).where(FacturaEmitida.numero == numero)).first()
+    if f is None:
+        typer.secho(f"No existe ninguna factura con n\u00famero '{numero}'", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    try:
+        path = generar_factura_pdf(f.id, Path(output) if output else None)
+    except ValueError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+    print(f"[green]\u2713 PDF generado en {path}[/green]")
 
 
 @app.command("gasto")
