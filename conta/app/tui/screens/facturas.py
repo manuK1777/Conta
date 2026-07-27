@@ -3,10 +3,12 @@ from decimal import Decimal
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.widget import Widget
+from rich.text import Text
 from textual.widgets import Button, DataTable, Input, Label, Select, Static
 
 from ...db import get_session
 from ...models import FacturaEmitida
+from ...services.facturas import bulk_set_estado_iva, facturas_periodo
 from sqlmodel import select
 
 
@@ -20,6 +22,11 @@ def _quarter(d: date) -> str:
 
 def _fmt_date(d: date) -> str:
     return d.strftime("%d-%m-%Y")
+
+
+def _estado_cobro_cell(estado: str | None) -> Text:
+    value = estado or ""
+    return Text(value, style="red" if value == "Pendiente" else "")
 
 
 COLUMNS = [
@@ -68,6 +75,8 @@ class FacturasTab(Widget):
         self._cliente: str = ""
         self._facturas: list[FacturaEmitida] = []
         self._selected_id: int | None = None
+        self._bulk_mode: bool = False
+        self._bulk_scope: tuple[int, int] | None = None
 
     def compose(self) -> ComposeResult:
         with Widget(id="fact-filter"):
@@ -82,6 +91,12 @@ class FacturasTab(Widget):
             yield Label("Cliente:")
             yield Input("", id="inp-cliente", placeholder="substring")
             yield Button("Filtrar", id="btn-filter", variant="primary")
+            yield Button(
+                "Marcar trimestre IVA",
+                id="btn-bulk-estado-iva",
+                variant="warning",
+                disabled=True,
+            )
 
         with Widget(id="fact-edit-bar"):
             yield Label("Nuevo estado factura:", id="edit-label")
@@ -99,6 +114,12 @@ class FacturasTab(Widget):
         for col_name, width in COLUMNS:
             table.add_column(col_name, width=width)
         self._load()
+        self._update_bulk_button_state()
+
+    def _update_bulk_button_state(self) -> None:
+        self.query_one("#btn-bulk-estado-iva", Button).disabled = not (
+            self._year and self._quarter
+        )
 
     def on_show(self) -> None:
         """Auto-refresh when screen becomes visible."""
@@ -148,7 +169,7 @@ class FacturasTab(Widget):
                 _fmt(f.ret_irpf_importe),
                 _fmt(row_total),
                 _fmt(row_percibido),
-                f.estado_cobro or "",
+                _estado_cobro_cell(f.estado_cobro),
                 f.estado or "",
                 str(f.actividad.value if hasattr(f.actividad, "value") else f.actividad),
                 key=str(f.id),
@@ -181,6 +202,10 @@ class FacturasTab(Widget):
             self._quarter = int(str(q_val)) if q_val else None
             self._cliente = self.query_one("#inp-cliente", Input).value.strip()
             self._load()
+            self._update_bulk_button_state()
+
+        elif event.button.id == "btn-bulk-estado-iva":
+            self._start_bulk_edit()
 
         elif event.button.id == "btn-save-estado":
             self._do_save_estado()
@@ -194,6 +219,7 @@ class FacturasTab(Widget):
         if row_key is None or row_key >= len(self._facturas):
             return
         f = self._facturas[row_key]
+        self._hide_edit_bar()  # reset any previous bulk-mode state
         self._selected_id = f.id
         # Pre-fill both fields with current values
         inp_estado = self.query_one("#inp-new-estado", Input)
@@ -204,20 +230,56 @@ class FacturasTab(Widget):
         bar.display = True
         inp_estado.focus()  # Focus on estado factura by default
 
+    def _start_bulk_edit(self) -> None:
+        if not self._year or not self._quarter:
+            return
+        count = len(facturas_periodo(self._year, self._quarter))
+        self._hide_edit_bar()  # reset any previous single-row state
+        self._bulk_mode = True
+        self._bulk_scope = (self._year, self._quarter)
+        # Bulk mode only touches Estado IVA — hide the Estado factura fields
+        self.query_one("#edit-label", Label).display = False
+        self.query_one("#inp-new-estado", Input).display = False
+        self.query_one("#edit-iva-label", Label).update(
+            f"Estado IVA para {count} factura(s) de {self._year} T{self._quarter} "
+            "(ignora filtro de cliente):"
+        )
+        inp_estado_iva = self.query_one("#inp-new-estado-iva", Input)
+        inp_estado_iva.value = ""
+        bar = self.query_one("#fact-edit-bar")
+        bar.display = True
+        inp_estado_iva.focus()
+
     def _hide_edit_bar(self) -> None:
         self.query_one("#fact-edit-bar").display = False
         self._selected_id = None
+        self._bulk_mode = False
+        self._bulk_scope = None
         # Clear both input fields
         self.query_one("#inp-new-estado", Input).value = ""
         self.query_one("#inp-new-estado-iva", Input).value = ""
+        # Restore Estado factura fields in case bulk mode hid them
+        self.query_one("#edit-label", Label).display = True
+        self.query_one("#inp-new-estado", Input).display = True
+        self.query_one("#edit-iva-label", Label).update("Nuevo estado IVA:")
 
     def _do_save_estado(self) -> None:
+        if self._bulk_mode:
+            if self._bulk_scope:
+                new_estado_iva = self.query_one("#inp-new-estado-iva", Input).value.strip()
+                if new_estado_iva:
+                    year, q = self._bulk_scope
+                    bulk_set_estado_iva(year, q, new_estado_iva)
+            self._hide_edit_bar()
+            self._load()
+            return
+
         if self._selected_id is None:
             return
-        
+
         new_estado = self.query_one("#inp-new-estado", Input).value.strip()
         new_estado_iva = self.query_one("#inp-new-estado-iva", Input).value.strip()
-        
+
         with get_session() as s:
             f = s.exec(
                 select(FacturaEmitida).where(FacturaEmitida.id == self._selected_id)
