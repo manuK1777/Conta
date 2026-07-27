@@ -113,7 +113,11 @@ class EmiteTab(Widget):
 
         with Widget(classes="form-row-multiline"):
             yield Label("Cliente dirección:")
-            yield TextArea("", id="fe-cliente-direccion")
+            yield TextArea(
+                "",
+                id="fe-cliente-direccion",
+                placeholder="Calle, número y piso\nCP - Ciudad",
+            )
 
         with Widget(classes="form-row"):
             yield Label("Cliente NIF:")

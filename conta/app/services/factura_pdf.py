@@ -207,9 +207,9 @@ def generar_factura_pdf(
     )
 
     if output_path is None:
-        facturas_dir = Path("reports") / "facturas"
+        facturas_dir = Path.home() / "repos" / "conta" / "reports" / "facturas"
         facturas_dir.mkdir(parents=True, exist_ok=True)
-        output_path = facturas_dir / f"{safe_numero_filename(factura.numero)}.pdf"
+        output_path = facturas_dir / f"Factura {factura.numero}.pdf"
 
     HTML(string=html_content).write_pdf(str(output_path))
 
