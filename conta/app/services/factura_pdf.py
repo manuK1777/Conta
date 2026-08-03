@@ -180,7 +180,7 @@ def generar_factura_pdf(
 
     total = factura.base_eur + factura.cuota_iva - factura.ret_irpf_importe
 
-    cliente_nif_html = f"<br>{factura.cliente_nif}" if factura.cliente_nif else ""
+    cliente_nif_html = factura.cliente_nif or ""
 
     html_content = HTML_TEMPLATE.format(
         jost_uri=_JOST_URI,
