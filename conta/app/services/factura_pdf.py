@@ -30,7 +30,9 @@ def _fmt_eur(v: Decimal) -> str:
 
 
 def _fecha_larga(d: date) -> str:
-    return f"{d.day} de {MESES_CA[d.month - 1]} de {d.year}"
+    mes = MESES_CA[d.month - 1]
+    prep = "d'" if mes[0] in "aeiou" else "de "
+    return f"{d.day} {prep}{mes} de {d.year}"
 
 
 def _fmt_pct(v: Decimal) -> str:
