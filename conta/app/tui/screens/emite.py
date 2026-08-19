@@ -121,7 +121,7 @@ class EmiteTab(Widget):
 
         with Widget(classes="form-row"):
             yield Label("Cliente NIF:")
-            yield Input("", id="fe-nif", placeholder="Opcional")
+            yield Input("", id="fe-nif", placeholder="ej. CIF Bxxxxxxxx")
 
         with Widget(classes="form-row"):
             yield Label("Base (EUR):")
