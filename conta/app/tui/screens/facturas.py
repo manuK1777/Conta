@@ -97,7 +97,9 @@ class FacturasTab(Widget):
     #fact-filter { height: 3; layout: horizontal; padding: 0 1; background: $panel; align: left middle; }
     #fact-filter Label { margin-right: 1; color: $text-muted; }
     #fact-filter Input { width: 10; margin-right: 2; }
+    #fact-filter #inp-cliente { width: 15; }
     #fact-filter Select { width: 12; margin-right: 2; }
+    #fact-filter #sel-estado { width: 17; }
     #fact-filter Button { margin-left: 1; }
     #fact-edit-bar { height: 3; layout: horizontal; padding: 0 1; background: $panel-darken-1; align: left middle; display: none; }
     #fact-edit-bar Label { margin-right: 1; color: $text-muted; }
@@ -111,6 +113,7 @@ class FacturasTab(Widget):
         self._year: int | None = date.today().year
         self._quarter: int | None = None  # 1-4 or None for all
         self._cliente: str = ""
+        self._estado: str = ""  # Cobrado / Pendiente / "" for all
         self._facturas: list[FacturaEmitida] = []
         self._selected_id: int | None = None
         self._bulk_mode: bool = False
@@ -127,7 +130,13 @@ class FacturasTab(Widget):
                 id="sel-quarter",
             )
             yield Label("Cliente:")
-            yield Input("", id="inp-cliente", placeholder="substring")
+            yield Input("", id="inp-cliente", placeholder="Nombre")
+            yield Label("Estado:")
+            yield Select(
+                [("Todo", ""), ("Cobrado", "Cobrado"), ("Pendiente", "Pendiente")],
+                value="",
+                id="sel-estado",
+            )
             yield Button("Filtrar", id="btn-filter", variant="primary")
             yield Button(
                 "Marcar trimestre IVA",
@@ -176,6 +185,11 @@ class FacturasTab(Widget):
             facturas = [
                 f for f in facturas
                 if self._cliente.lower() in f.cliente_nombre.lower()
+            ]
+        if self._estado:
+            facturas = [
+                f for f in facturas
+                if (f.estado_cobro or "").lower() == self._estado.lower()
             ]
 
         self._facturas = facturas
@@ -239,6 +253,8 @@ class FacturasTab(Widget):
             q_val = self.query_one("#sel-quarter", Select).value
             self._quarter = int(str(q_val)) if q_val else None
             self._cliente = self.query_one("#inp-cliente", Input).value.strip()
+            estado_val = self.query_one("#sel-estado", Select).value
+            self._estado = str(estado_val) if estado_val else ""
             self._load()
             self._update_bulk_button_state()
 
