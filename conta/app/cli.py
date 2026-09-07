@@ -57,14 +57,19 @@ def backup_db(
         typer.secho(f"No se encontró la base de datos en {src}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
-    dest_dir_path = Path(dest_dir)
-    dest_dir_path.mkdir(parents=True, exist_ok=True)
+    dest_dirs = [
+        Path(dest_dir),
+        Path.home() / "Documentos/oficina/HACIENDA/FACTURAS y presentaciones IVA/conta db backups",
+    ]
 
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M")
-    dest_path = dest_dir_path / f"conta-{timestamp}.db"
+    timestamp = datetime.now().strftime("%d-%m-%Y-%H%M")
+    filename = f"conta-{timestamp}.db"
 
-    shutil.copy2(src_path, dest_path)
-    typer.secho(f"Backup creado en {dest_path}", fg=typer.colors.GREEN)
+    for dest_dir_path in dest_dirs:
+        dest_dir_path.mkdir(parents=True, exist_ok=True)
+        dest_path = dest_dir_path / filename
+        shutil.copy2(src_path, dest_path)
+        typer.secho(f"Backup creado en {dest_path}", fg=typer.colors.GREEN)
 
 
 @app.command("emite")
