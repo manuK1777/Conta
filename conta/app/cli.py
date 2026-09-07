@@ -1,3 +1,4 @@
+import os
 import typer
 from rich import print
 from rich.table import Table
@@ -44,9 +45,9 @@ def init():
 @app.command("backup-db")
 def backup_db(
     dest_dir: str = typer.Option(
-        str(Path.home() / "repos/conta/backups"),
+        None,
         "--dir",
-        help="Carpeta destino del backup (por defecto: ~/repos/conta/backups)",
+        help="Carpeta destino única del backup (sobreescribe CONTA_BACKUP_DIRS)",
     ),
 ):
     """Crea una copia de seguridad de la base de datos SQLite."""
@@ -57,10 +58,11 @@ def backup_db(
         typer.secho(f"No se encontró la base de datos en {src}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
-    dest_dirs = [
-        Path(dest_dir),
-        Path.home() / "Documentos/oficina/HACIENDA/FACTURAS y presentaciones IVA/conta db backups",
-    ]
+    if dest_dir:
+        dest_dirs = [Path(dest_dir).expanduser()]
+    else:
+        raw = os.getenv("CONTA_BACKUP_DIRS", "~/repos/conta/backups")
+        dest_dirs = [Path(p.strip()).expanduser() for p in raw.split(":") if p.strip()]
 
     timestamp = datetime.now().strftime("%d-%m-%Y-%H%M")
     filename = f"conta-{timestamp}.db"
