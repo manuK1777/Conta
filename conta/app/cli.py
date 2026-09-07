@@ -5,8 +5,7 @@ from rich.table import Table
 from decimal import Decimal
 from datetime import date, datetime
 from pathlib import Path
-import shutil
-from .db import init_db, get_session, DB_PATH
+from .db import init_db, get_session
 from .models import (
     FacturaEmitida,
     GastoDeducible,
@@ -23,6 +22,7 @@ from .services.libros import export_libros
 from .services.importacion_pdf.importador_factura import importar_factura_pdf
 from .services.emisor import get_emisor_config, set_emisor_config
 from .services.factura_pdf import generar_factura_pdf
+from .services.backup import crear_backup
 
 
 
@@ -51,26 +51,13 @@ def backup_db(
     ),
 ):
     """Crea una copia de seguridad de la base de datos SQLite."""
-    src = DB_PATH
-    src_path = Path(src)
-
-    if not src_path.exists():
-        typer.secho(f"No se encontró la base de datos en {src}", fg=typer.colors.RED)
+    try:
+        dest_paths = crear_backup(dest_dir)
+    except FileNotFoundError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
-    if dest_dir:
-        dest_dirs = [Path(dest_dir).expanduser()]
-    else:
-        raw = os.getenv("CONTA_BACKUP_DIRS", "~/repos/conta/backups")
-        dest_dirs = [Path(p.strip()).expanduser() for p in raw.split(":") if p.strip()]
-
-    timestamp = datetime.now().strftime("%d-%m-%Y-%H%M")
-    filename = f"conta-{timestamp}.db"
-
-    for dest_dir_path in dest_dirs:
-        dest_dir_path.mkdir(parents=True, exist_ok=True)
-        dest_path = dest_dir_path / filename
-        shutil.copy2(src_path, dest_path)
+    for dest_path in dest_paths:
         typer.secho(f"Backup creado en {dest_path}", fg=typer.colors.GREEN)
 
 

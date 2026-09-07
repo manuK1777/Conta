@@ -8,6 +8,7 @@ from .screens.gastos import GastosTab
 from .screens.emite import EmiteTab
 from .screens.gasto_form import GastoFormTab
 from .screens.m130 import M130Tab
+from ..services.backup import crear_backup
 
 CSS_PATH = Path(__file__).parent / "conta.tcss"
 
@@ -26,6 +27,7 @@ class ContaApp(App):
         ("f4", "switch_tab('emite')", "Emite"),
         ("f5", "switch_tab('gasto')", "Gasto"),
         ("f6", "switch_tab('m130')", "M130"),
+        ("b", "backup_db", "Backup"),
         ("q", "quit", "Salir"),
     ]
 
@@ -45,6 +47,17 @@ class ContaApp(App):
             with TabPane("F6 M130", id="m130"):
                 yield M130Tab()
         yield Footer()
+
+    def action_backup_db(self) -> None:
+        try:
+            dest_paths = crear_backup()
+        except FileNotFoundError as e:
+            self.notify(str(e), severity="error")
+            return
+        self.notify(
+            "Backup creado en:\n" + "\n".join(str(p) for p in dest_paths),
+            title="Backup DB",
+        )
 
     def action_switch_tab(self, tab_id: str) -> None:
         tabs = self.query_one(TabbedContent)
