@@ -2,7 +2,7 @@ import os
 import typer
 from rich import print
 from rich.table import Table
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime
 from pathlib import Path
 from .db import init_db, get_session
@@ -103,8 +103,8 @@ def add_factura(
         notas=notas,
         archivo_pdf_path=pdf,
     )
-    cuota_iva = (f.base_eur * f.tipo_iva / 100).quantize(Decimal("0.01"))
-    ret_importe = (f.base_eur * f.ret_irpf_pct / 100).quantize(Decimal("0.01"))
+    cuota_iva = (f.base_eur * f.tipo_iva / 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    ret_importe = (f.base_eur * f.ret_irpf_pct / 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     m = FacturaEmitida(**f.model_dump(), cuota_iva=cuota_iva, ret_irpf_importe=ret_importe)
     from sqlmodel import select
     with get_session() as s:
@@ -554,6 +554,41 @@ def set_estado(
 
         typer.secho(
             f"Updated estado de cobro to '{estado}' for {len(facturas)} invoice(s) ({ident_desc})",
+            fg=typer.colors.GREEN,
+        )
+
+
+@app.command("borrar-factura")
+def borrar_factura(
+    id: int = typer.Option(..., "--id", help="ID de la factura a borrar"),
+    numero: str = typer.Option(
+        ..., "--numero", help="Número de factura, como confirmación de seguridad"
+    ),
+):
+    """Borra una factura emitida, dado su id y numero (ambos deben coincidir)."""
+    from sqlmodel import select
+
+    with get_session() as s:
+        stmt = select(FacturaEmitida).where(FacturaEmitida.id == id)
+        factura = s.exec(stmt).first()
+
+        if factura is None:
+            typer.secho(f"No invoice found with id={id}", fg=typer.colors.YELLOW)
+            raise typer.Exit(code=1)
+
+        if factura.numero != numero:
+            typer.secho(
+                f"Mismatch: invoice id={id} has numero='{factura.numero}', "
+                f"not '{numero}'. Aborting.",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=1)
+
+        s.delete(factura)
+        s.commit()
+
+        typer.secho(
+            f"Deleted invoice id={id}, numero='{numero}'",
             fg=typer.colors.GREEN,
         )
 

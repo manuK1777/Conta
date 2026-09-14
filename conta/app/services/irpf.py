@@ -100,7 +100,7 @@ def irpf_snapshot_acumulado(
         retenciones = sum(
             (f.ret_irpf_importe for f in facturas),
             Decimal("0"),
-        ).quantize(TWOPLACES)
+        ).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
     # Casilla 05: solo se suman los resultados POSITIVOS de trimestres
     # anteriores del mismo ejercicio. Un resultado negativo (a devolver/sin
@@ -108,7 +108,7 @@ def irpf_snapshot_acumulado(
     # Ref.: instrucciones modelo 130, casilla 05.
     pagos_previos_total = sum(
         (max(p.resultado, Decimal("0")) for p in pagos_previos), Decimal("0")
-    ).quantize(TWOPLACES)
+    ).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
     resultado = (
         base_20
@@ -117,16 +117,16 @@ def irpf_snapshot_acumulado(
     ).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
     return {
-        "ingresos": ingresos.quantize(TWOPLACES),
-        "gastos": total_gastos.quantize(TWOPLACES),
-        "rendimiento": rendimiento.quantize(TWOPLACES),
+        "ingresos": ingresos.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
+        "gastos": total_gastos.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
+        "rendimiento": rendimiento.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
         "base_20": base_20,
         "retenciones": retenciones,
         "pagos_previos": pagos_previos_total,
         "resultado": resultado,
         "detalle": {
-            "gastos_sin_cuotas": gastos_sin_ss.quantize(TWOPLACES),
-            "cuotas_ss": cuotas_ss.quantize(TWOPLACES),
+            "gastos_sin_cuotas": gastos_sin_ss.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
+            "cuotas_ss": cuotas_ss.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
         },
     }
 

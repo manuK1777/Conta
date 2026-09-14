@@ -2,7 +2,7 @@ import platform
 import subprocess
 import tempfile
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from textual.app import ComposeResult
 from textual.suggester import SuggestFromList
@@ -253,8 +253,8 @@ class EmiteTab(Widget):
             actividad_val = str(self.query_one("#fe-actividad", Select).value)
             actividad = Actividad(actividad_val)
 
-            cuota_iva = (base_eur * tipo_iva / Decimal("100")).quantize(Decimal("0.01"))
-            irpf_importe = (base_eur * irpf_pct / Decimal("100")).quantize(Decimal("0.01"))
+            cuota_iva = (base_eur * tipo_iva / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            irpf_importe = (base_eur * irpf_pct / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
             f = FacturaEmitida(
                 numero=numero,
