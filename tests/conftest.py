@@ -6,8 +6,10 @@ conta.app.db.engine at a throwaway per-test SQLite file. The real conta.db is ne
 touched by this suite.
 """
 
+import json
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
@@ -148,3 +150,70 @@ def file_m130(
         session.commit()
         session.refresh(p)
     return p
+
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+def load_fixture(name: str) -> dict:
+    """Load a JSON fixture from tests/fixtures/ (e.g. real production rows
+    dumped read-only from conta.db, so tests never depend on conta.db being
+    present at run time)."""
+    with open(FIXTURES_DIR / name) as f:
+        return json.load(f)
+
+
+def insert_fixture_data(
+    session: Session,
+    fixture: dict,
+    *,
+    from_date: date,
+    to_date: date,
+) -> None:
+    """Insert facturas/gastos/cuotas_autonomo from a loaded fixture dict whose
+    date falls within [from_date, to_date], preserving every stored field
+    exactly (no recomputation) -- callers pass one quarter's range at a time
+    so a multi-quarter chain test can stage data incrementally."""
+    for f in fixture.get("facturas", []):
+        fecha = date.fromisoformat(f["fecha_emision"])
+        if not (from_date <= fecha <= to_date):
+            continue
+        make_factura(
+            session,
+            numero=f["numero"],
+            fecha=fecha,
+            base_eur=Decimal(f["base_eur"]),
+            tipo_iva=Decimal(f["tipo_iva"]),
+            cuota_iva=Decimal(f["cuota_iva"]),
+            ret_irpf_pct=Decimal(f["ret_irpf_pct"]),
+            ret_irpf_importe=Decimal(f["ret_irpf_importe"]),
+            actividad=Actividad(f["actividad"]),
+            commit=False,
+        )
+    for g in fixture.get("gastos", []):
+        fecha = date.fromisoformat(g["fecha"])
+        if not (from_date <= fecha <= to_date):
+            continue
+        make_gasto(
+            session,
+            proveedor=g["proveedor"],
+            fecha=fecha,
+            base_eur=Decimal(g["base_eur"]),
+            tipo_iva=Decimal(g["tipo_iva"]),
+            cuota_iva=Decimal(g["cuota_iva"]),
+            afecto_pct=Decimal(g["afecto_pct"]),
+            iva_deducible=g["iva_deducible"],
+            commit=False,
+        )
+    for c in fixture.get("cuotas_autonomo", []):
+        fecha = date.fromisoformat(c["fecha"])
+        if not (from_date <= fecha <= to_date):
+            continue
+        make_cuota_autonomo(
+            session,
+            fecha=fecha,
+            importe_eur=Decimal(c["importe_eur"]),
+            concepto=c.get("concepto"),
+            commit=False,
+        )
+    session.commit()
