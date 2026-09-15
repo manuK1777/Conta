@@ -4,8 +4,12 @@ from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import Button, Input, Label, Select, Static
 
-from ...db import get_session
-from ...models import PagoFraccionado130
+from ...services.m130 import (
+    PagoRegistrado,
+    PeriodoYaRegistrado,
+    ResultadoNoCoincide,
+    registrar_pago_m130,
+)
 
 
 def _parse_date(raw: str) -> date:
@@ -45,6 +49,14 @@ class M130Tab(Widget):
     #m130-buttons Button { margin-right: 2; }
     """
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # Tracks a mismatch warning awaiting confirmation: the exact
+        # (year, quarter, resultado_manual) that triggered it. A second
+        # "Guardar" press with the same values is treated as confirmation
+        # (force=True) -- the TUI equivalent of the CLI's --force flag.
+        self._pending_mismatch_key: tuple[int, int, Decimal] | None = None
+
     def compose(self) -> ComposeResult:
         today = date.today()
         yield Label("Nuevo pago fraccionado — Modelo 130", classes="card-title")
@@ -66,8 +78,12 @@ class M130Tab(Widget):
             yield Input("", id="m130-importe", placeholder="ej. 350.00")
 
         with Widget(classes="form-row"):
-            yield Label("Resultado 130 (EUR):")
-            yield Input("0.00", id="m130-resultado", placeholder="resultado calculado")
+            yield Label("Resultado 130 (override):")
+            yield Input(
+                "",
+                id="m130-resultado",
+                placeholder="Dejar vacío para cálculo automático",
+            )
 
         with Widget(classes="form-row"):
             yield Label("Fecha pago:")
@@ -83,10 +99,22 @@ class M130Tab(Widget):
     def _get(self, field_id: str) -> str:
         return self.query_one(f"#{field_id}", Input).value.strip()
 
-    def _clear(self) -> None:
+    def _reset_pending_mismatch(self) -> None:
+        self._pending_mismatch_key = None
+        self.query_one("#btn-m130-save", Button).label = "Guardar"
+
+    def _clear_fields(self) -> None:
+        """Reset the input fields after a successful save, WITHOUT wiping the
+        status message that was just shown (a prior version of this screen
+        called status.update(...) and then immediately cleared it again)."""
         self.query_one("#m130-importe", Input).value = ""
-        self.query_one("#m130-resultado", Input).value = "0.00"
+        self.query_one("#m130-resultado", Input).value = ""
         self.query_one("#m130-fecha", Input).value = ""
+        self._reset_pending_mismatch()
+
+    def _clear(self) -> None:
+        """Full reset for the "Limpiar" button: fields plus any messages."""
+        self._clear_fields()
         self.query_one("#m130-status", Static).update("")
         self.query_one("#m130-error", Static).update("")
 
@@ -121,30 +149,53 @@ class M130Tab(Widget):
             except InvalidOperation:
                 raise ValueError(f"Importe inválido: '{importe_raw}'")
 
-            resultado_raw = self._get("m130-resultado") or "0.00"
-            try:
-                resultado = Decimal(resultado_raw)
-            except InvalidOperation:
-                raise ValueError(f"Resultado inválido: '{resultado_raw}'")
+            resultado_raw = self._get("m130-resultado")
+            resultado_manual: Decimal | None = None
+            if resultado_raw:
+                try:
+                    resultado_manual = Decimal(resultado_raw)
+                except InvalidOperation:
+                    raise ValueError(f"Resultado inválido: '{resultado_raw}'")
 
             fecha = _parse_date(self._get("m130-fecha"))
 
-            p = PagoFraccionado130(
+            # A second "Guardar" press with the exact same year/quarter/
+            # resultado_manual as the last mismatch warning counts as an
+            # explicit confirmation to proceed anyway.
+            pending_key = (year, quarter, resultado_manual)
+            force = (
+                resultado_manual is not None
+                and self._pending_mismatch_key == pending_key
+            )
+
+            result = registrar_pago_m130(
                 year=year,
                 quarter=quarter,
-                importe=importe.quantize(Decimal("0.01")),
-                resultado=resultado.quantize(Decimal("0.01")),
+                importe=importe,
+                resultado_manual=resultado_manual,
+                force=force,
                 fecha_pago=fecha,
             )
 
-            with get_session() as s:
-                s.add(p)
-                s.commit()
+            if isinstance(result, PeriodoYaRegistrado):
+                self._reset_pending_mismatch()
+                raise ValueError(f"Ya existe un pago registrado para {year}Q{quarter}")
 
+            if isinstance(result, ResultadoNoCoincide):
+                self._pending_mismatch_key = pending_key
+                self.query_one("#btn-m130-save", Button).label = "Confirmar y guardar"
+                error.update(
+                    f"El resultado indicado ({result.resultado_manual} €) difiere del "
+                    f"calculado ({result.computed_resultado} €) en más de 1 céntimo. "
+                    f"Pulsa «Confirmar y guardar» para registrarlo igualmente."
+                )
+                return
+
+            assert isinstance(result, PagoRegistrado)
             status.update(
-                f"✓ Pago M130 {year}Q{quarter} — {importe:.2f} € guardado correctamente"
+                f"✓ Pago M130 {year}Q{quarter} — {result.pago.importe} € guardado correctamente"
             )
-            self._clear()
+            self._clear_fields()
 
         except Exception as exc:
             error.update(f"Error: {exc}")

@@ -744,11 +744,13 @@ def pagar_m130(
     1 céntimo requiere --force, para no registrar por error una cifra que no
     corresponde a los datos reales.
     """
-    from datetime import date
-    from decimal import Decimal, ROUND_HALF_UP
-    from sqlmodel import select
-
-    TWOPLACES = Decimal("0.01")
+    from decimal import Decimal
+    from .services.m130 import (
+        PagoRegistrado,
+        PeriodoYaRegistrado,
+        ResultadoNoCoincide,
+        registrar_pago_m130,
+    )
 
     def _parse_importe(v: str) -> Decimal:
         normalized = v.strip().replace(" ", "").replace(",", ".")
@@ -773,53 +775,40 @@ def pagar_m130(
         typer.secho("El importe ingresado no puede ser negativo", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    with get_session() as s:
-        existente = s.exec(
-            select(PagoFraccionado130).where(
-                PagoFraccionado130.year == year,
-                PagoFraccionado130.quarter == q,
-            )
-        ).first()
-
-        if existente:
-            typer.secho(f"Ya existe un pago registrado para {periodo}", fg=typer.colors.RED)
-            raise typer.Exit(1)
-
-    computed_resultado = irpf_snapshot_acumulado(year, q)["resultado"]
-
-    if resultado is None:
-        resultado_dec = computed_resultado
-    else:
+    resultado_dec = None
+    if resultado is not None:
         try:
-            resultado_dec = _parse_importe(resultado).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+            resultado_dec = _parse_importe(resultado)
         except Exception:
             typer.secho("Resultado inválido. Usa formato -115.64 (o -115,64)", fg=typer.colors.RED)
             raise typer.Exit(1)
 
-        if abs(resultado_dec - computed_resultado) > TWOPLACES and not force:
-            typer.secho(
-                f"El --resultado indicado ({resultado_dec} €) difiere del calculado "
-                f"({computed_resultado} €) en más de 1 céntimo.\n"
-                f"Usa --force si realmente quieres registrar {resultado_dec} € "
-                f"en lugar del valor calculado.",
-                fg=typer.colors.RED,
-            )
-            raise typer.Exit(1)
+    result = registrar_pago_m130(
+        year=year,
+        quarter=q,
+        importe=importe_dec,
+        resultado_manual=resultado_dec,
+        force=force,
+    )
 
-    with get_session() as s:
-        pago = PagoFraccionado130(
-            year=year,
-            quarter=q,
-            importe=importe_dec.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
-            resultado=resultado_dec.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
-            fecha_pago=date.today(),
+    if isinstance(result, PeriodoYaRegistrado):
+        typer.secho(f"Ya existe un pago registrado para {periodo}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if isinstance(result, ResultadoNoCoincide):
+        typer.secho(
+            f"El --resultado indicado ({result.resultado_manual} €) difiere del calculado "
+            f"({result.computed_resultado} €) en más de 1 céntimo.\n"
+            f"Usa --force si realmente quieres registrar {result.resultado_manual} € "
+            f"en lugar del valor calculado.",
+            fg=typer.colors.RED,
         )
+        raise typer.Exit(1)
 
-        s.add(pago)
-        s.commit()
-
+    assert isinstance(result, PagoRegistrado)
     typer.secho(
-        f"✔ Pago fraccionado 130 registrado: {periodo} → ingresado: {importe_dec.quantize(TWOPLACES)} € | resultado: {resultado_dec.quantize(TWOPLACES)} €",
+        f"✔ Pago fraccionado 130 registrado: {periodo} → ingresado: {result.pago.importe} € "
+        f"| resultado: {result.pago.resultado} €",
         fg=typer.colors.GREEN,
     )
 

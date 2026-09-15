@@ -25,6 +25,12 @@ from conta.app.models import (
 
 
 @pytest.fixture
+def anyio_backend():
+    """Restrict anyio-marked async tests (Textual's App.run_test()) to asyncio."""
+    return "asyncio"
+
+
+@pytest.fixture
 def db(monkeypatch, tmp_path):
     """Point conta.app.db.engine at a fresh, isolated SQLite file for this test only."""
     db_path = tmp_path / "test_conta.db"
