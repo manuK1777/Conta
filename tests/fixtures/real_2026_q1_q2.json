@@ -1,0 +1,67 @@
+{
+  "_meta": {
+    "description": "Real FacturaEmitida/GastoDeducible/PagoAutonomo rows for 2026Q1+Q2, extracted read-only from the live conta.db (never written to). Dumped so the golden test does not depend on conta.db being present at run time.",
+    "extracted": "2026-09-15",
+    "date_range": "2026-01-01 to 2026-06-30"
+  },
+  "facturas": [
+    {"numero": "01 26", "fecha_emision": "2026-01-26", "base_eur": "250",    "tipo_iva": "21", "cuota_iva": "52.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "37.5",  "actividad": "musica"},
+    {"numero": "02 26", "fecha_emision": "2026-01-30", "base_eur": "205.82", "tipo_iva": "21", "cuota_iva": "43.22", "ret_irpf_pct": "15", "ret_irpf_importe": "30.87", "actividad": "musica"},
+    {"numero": "03 26", "fecha_emision": "2026-02-03", "base_eur": "103.98", "tipo_iva": "21", "cuota_iva": "21.84", "ret_irpf_pct": "15", "ret_irpf_importe": "15.6",  "actividad": "musica"},
+    {"numero": "04 26", "fecha_emision": "2026-02-16", "base_eur": "250",    "tipo_iva": "21", "cuota_iva": "52.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "37.5",  "actividad": "musica"},
+    {"numero": "05 26", "fecha_emision": "2026-02-24", "base_eur": "350",    "tipo_iva": "21", "cuota_iva": "73.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "52.5",  "actividad": "musica"},
+    {"numero": "06 26", "fecha_emision": "2026-02-24", "base_eur": "500",    "tipo_iva": "21", "cuota_iva": "105",   "ret_irpf_pct": "15", "ret_irpf_importe": "75",    "actividad": "musica"},
+    {"numero": "07 26", "fecha_emision": "2026-03-02", "base_eur": "350",    "tipo_iva": "21", "cuota_iva": "73.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "52.5",  "actividad": "musica"},
+    {"numero": "08 26", "fecha_emision": "2026-03-04", "base_eur": "125.96", "tipo_iva": "21", "cuota_iva": "26.45", "ret_irpf_pct": "15", "ret_irpf_importe": "18.89", "actividad": "musica"},
+    {"numero": "B01 26", "fecha_emision": "2026-03-19", "base_eur": "200",   "tipo_iva": "0",  "cuota_iva": "0",     "ret_irpf_pct": "15", "ret_irpf_importe": "30",    "actividad": "musica"},
+
+    {"numero": "09 26", "fecha_emision": "2026-04-27", "base_eur": "250",    "tipo_iva": "21", "cuota_iva": "52.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "37.5",  "actividad": "musica"},
+    {"numero": "10 26", "fecha_emision": "2026-05-11", "base_eur": "250",    "tipo_iva": "21", "cuota_iva": "52.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "37.5",  "actividad": "musica"},
+    {"numero": "11 26", "fecha_emision": "2026-05-15", "base_eur": "61.9",   "tipo_iva": "21", "cuota_iva": "13",    "ret_irpf_pct": "15", "ret_irpf_importe": "9.29",  "actividad": "musica"},
+    {"numero": "12 26", "fecha_emision": "2026-05-18", "base_eur": "250",    "tipo_iva": "21", "cuota_iva": "52.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "37.5",  "actividad": "musica"},
+    {"numero": "13 26", "fecha_emision": "2026-06-01", "base_eur": "150",    "tipo_iva": "21", "cuota_iva": "31.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "22.5",  "actividad": "musica"},
+    {"numero": "14 26", "fecha_emision": "2026-06-01", "base_eur": "750",    "tipo_iva": "21", "cuota_iva": "157.5", "ret_irpf_pct": "15", "ret_irpf_importe": "112.5", "actividad": "musica"},
+    {"numero": "15 26", "fecha_emision": "2026-06-05", "base_eur": "121.24", "tipo_iva": "21", "cuota_iva": "25.46", "ret_irpf_pct": "15", "ret_irpf_importe": "18.19", "actividad": "musica"},
+    {"numero": "16 26", "fecha_emision": "2026-06-05", "base_eur": "150",    "tipo_iva": "21", "cuota_iva": "31.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "22.5",  "actividad": "musica"},
+    {"numero": "17 26", "fecha_emision": "2026-06-05", "base_eur": "300",    "tipo_iva": "21", "cuota_iva": "63",    "ret_irpf_pct": "15", "ret_irpf_importe": "45",    "actividad": "musica"},
+    {"numero": "18 26", "fecha_emision": "2026-06-10", "base_eur": "750",    "tipo_iva": "21", "cuota_iva": "157.5", "ret_irpf_pct": "15", "ret_irpf_importe": "112.5", "actividad": "musica"},
+    {"numero": "19 26", "fecha_emision": "2026-06-15", "base_eur": "350",    "tipo_iva": "21", "cuota_iva": "73.5",  "ret_irpf_pct": "15", "ret_irpf_importe": "52.5",  "actividad": "musica"}
+  ],
+  "gastos": [
+    {"proveedor": "Open AI",           "fecha": "2026-01-03", "base_eur": "17.08",  "tipo_iva": "21", "cuota_iva": "3.58",  "afecto_pct": "100", "iva_deducible": false},
+    {"proveedor": "thomann",           "fecha": "2026-01-13", "base_eur": "316.07", "tipo_iva": "0",  "cuota_iva": "0",     "afecto_pct": "100", "iva_deducible": false},
+    {"proveedor": "Exafunction, Inc",  "fecha": "2026-01-23", "base_eur": "12.86",  "tipo_iva": "21", "cuota_iva": "2.7",   "afecto_pct": "100", "iva_deducible": false},
+    {"proveedor": "Railway",           "fecha": "2026-01-27", "base_eur": "4.23",   "tipo_iva": "21", "cuota_iva": "0.88",  "afecto_pct": "100", "iva_deducible": false},
+    {"proveedor": "Open AI",           "fecha": "2026-02-03", "base_eur": "16.97",  "tipo_iva": "21", "cuota_iva": "3.56",  "afecto_pct": "100", "iva_deducible": false},
+    {"proveedor": "Alfasoni",          "fecha": "2026-02-05", "base_eur": "97.16",  "tipo_iva": "21", "cuota_iva": "20.4",  "afecto_pct": "100", "iva_deducible": true},
+    {"proveedor": "Alfasoni",          "fecha": "2026-02-06", "base_eur": "24.55",  "tipo_iva": "21", "cuota_iva": "5.15",  "afecto_pct": "100", "iva_deducible": true},
+    {"proveedor": "Exafunction, Inc",  "fecha": "2026-02-23", "base_eur": "12.78",  "tipo_iva": "21", "cuota_iva": "2.68",  "afecto_pct": "100", "iva_deducible": false},
+    {"proveedor": "Railway",           "fecha": "2026-02-27", "base_eur": "4.25",   "tipo_iva": "21", "cuota_iva": "0.89",  "afecto_pct": "100", "iva_deducible": false},
+    {"proveedor": "Alfasoni",          "fecha": "2026-03-09", "base_eur": "35.37",  "tipo_iva": "21", "cuota_iva": "7.43",  "afecto_pct": "100", "iva_deducible": true},
+
+    {"proveedor": "Alfasoni",          "fecha": "2026-05-20", "base_eur": "17.9",   "tipo_iva": "21", "cuota_iva": "3.76",  "afecto_pct": "100", "iva_deducible": true},
+    {"proveedor": "Media Markt",       "fecha": "2026-05-27", "base_eur": "29.73",  "tipo_iva": "21", "cuota_iva": "6.25",  "afecto_pct": "100", "iva_deducible": true}
+  ],
+  "cuotas_autonomo": [
+    {"fecha": "2026-01-30", "importe_eur": "303.28", "concepto": "Cuota autónomos enero"},
+    {"fecha": "2026-02-27", "importe_eur": "303.28", "concepto": "Cuota autónomos febrero"},
+
+    {"fecha": "2026-04-30", "importe_eur": "11.06",  "concepto": "Cuota autonomos abril"},
+    {"fecha": "2026-05-29", "importe_eur": "157.85", "concepto": "Cuota autónomos mayo"},
+    {"fecha": "2026-06-30", "importe_eur": "205.86", "concepto": "Cuota autónomos junio"}
+  ],
+  "filed": {
+    "2026Q1": {
+      "irpf_resultado": "-115.64",
+      "iva_resultado": "415.53",
+      "note": "PagoFraccionado130 id=3 and Presentacion303 id=1: both match irpf_snapshot_acumulado()/iva_trimestre() exactly. No discrepancy of any kind for this quarter."
+    },
+    "2026Q2": {
+      "iva_resultado": "700.45",
+      "note": "Presentacion303 id=6: matches iva_trimestre() exactly.",
+      "irpf_baseline_resultado": "-30.97",
+      "irpf_baseline_retenciones": "857.84",
+      "irpf_note": "PagoFraccionado130 id=4 stores resultado=0.00, NOT used as ground truth here: root-caused to a pagar-m130 CLI footgun (--resultado defaults to \"0\" when the flag is omitted, so the actual computed result was never recorded). Separately, the real filed AEAT Modelo 130 (2026-07-07) shows casilla 06 (retenciones) = 857.87, a 0.03 EUR discrepancy from the code's 857.84. ROOT CAUSE CONFIRMED (not a code bug): a manual transcription error when filling out the AEAT web form (857.87 entered instead of 857.84). Verified by checking every Q2 invoice's ret_irpf_importe against Conta's stored values one by one -- they match exactly -- and confirming 350.36 (Q1 retenciones) + 507.48 (Q2-only retenciones) = 857.84. This baseline (857.84 / -30.97) is therefore the CORRECT frozen reference value, not merely 'what the code happens to output'."
+    }
+  }
+}

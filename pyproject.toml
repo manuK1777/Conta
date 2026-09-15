@@ -23,6 +23,9 @@ dependencies = [
 "weasyprint>=62.0",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
 
 [tool.setuptools.packages.find]
 where = ["."]
