@@ -719,15 +719,36 @@ def add_cuota(
 def pagar_m130(
     periodo: str = typer.Argument(..., help="Formato YYYYQ#, ej: 2025Q3"),
     importe: str = typer.Argument(..., help="Importe ingresado (0 si resultado negativo)"),
-    resultado: str = typer.Option("0", "--resultado", help="Resultado real del cálculo, puede ser negativo. Ej: --resultado -115.64"),
+    resultado: str | None = typer.Option(
+        None,
+        "--resultado",
+        help=(
+            "Resultado a registrar si difiere del calculado (p.ej. una cifra ya "
+            "presentada en la AEAT). Si se omite, se usa el resultado calculado "
+            "a partir de los datos actuales. Ej: --resultado -115.64"
+        ),
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Registra --resultado aunque difiera del calculado en más de 1 céntimo.",
+    ),
 ):
     """
     Registra el pago de un Modelo 130 presentado.
     Imprescindible para el cálculo correcto de trimestres posteriores.
+
+    El resultado se calcula automáticamente a partir de las facturas/gastos/
+    cuotas ya registrados para el periodo (irpf_snapshot_acumulado). --resultado
+    permite anotar un valor distinto al calculado, pero un desajuste de más de
+    1 céntimo requiere --force, para no registrar por error una cifra que no
+    corresponde a los datos reales.
     """
     from datetime import date
     from decimal import Decimal, ROUND_HALF_UP
     from sqlmodel import select
+
+    TWOPLACES = Decimal("0.01")
 
     def _parse_importe(v: str) -> Decimal:
         normalized = v.strip().replace(" ", "").replace(",", ".")
@@ -748,13 +769,7 @@ def pagar_m130(
         typer.secho("Importe inválido. Usa formato 123.45 (o 123,45)", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    try:
-        resultado_dec = _parse_importe(resultado)
-    except Exception:
-        typer.secho("Resultado inválido. Usa formato -115.64 (o -115,64)", fg=typer.colors.RED)
-        raise typer.Exit(1)
-
-    if importe_dec < 0:  # ← cambiado de <= a 
+    if importe_dec < 0:
         typer.secho("El importe ingresado no puede ser negativo", fg=typer.colors.RED)
         raise typer.Exit(1)
 
@@ -770,11 +785,33 @@ def pagar_m130(
             typer.secho(f"Ya existe un pago registrado para {periodo}", fg=typer.colors.RED)
             raise typer.Exit(1)
 
+    computed_resultado = irpf_snapshot_acumulado(year, q)["resultado"]
+
+    if resultado is None:
+        resultado_dec = computed_resultado
+    else:
+        try:
+            resultado_dec = _parse_importe(resultado).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+        except Exception:
+            typer.secho("Resultado inválido. Usa formato -115.64 (o -115,64)", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        if abs(resultado_dec - computed_resultado) > TWOPLACES and not force:
+            typer.secho(
+                f"El --resultado indicado ({resultado_dec} €) difiere del calculado "
+                f"({computed_resultado} €) en más de 1 céntimo.\n"
+                f"Usa --force si realmente quieres registrar {resultado_dec} € "
+                f"en lugar del valor calculado.",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+    with get_session() as s:
         pago = PagoFraccionado130(
             year=year,
             quarter=q,
-            importe=importe_dec.quantize(Decimal("0.01")),
-            resultado=resultado_dec.quantize(Decimal("0.01")),  # ← NUEVO
+            importe=importe_dec.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
+            resultado=resultado_dec.quantize(TWOPLACES, rounding=ROUND_HALF_UP),
             fecha_pago=date.today(),
         )
 
@@ -782,7 +819,7 @@ def pagar_m130(
         s.commit()
 
     typer.secho(
-        f"✔ Pago fraccionado 130 registrado: {periodo} → ingresado: {importe_dec.quantize(Decimal('0.01'))} € | resultado: {resultado_dec.quantize(Decimal('0.01'))} €",
+        f"✔ Pago fraccionado 130 registrado: {periodo} → ingresado: {importe_dec.quantize(TWOPLACES)} € | resultado: {resultado_dec.quantize(TWOPLACES)} €",
         fg=typer.colors.GREEN,
     )
 
