@@ -10,7 +10,14 @@ from sqlalchemy import text
 load_dotenv()
 
 
-DB_PATH = os.getenv("CONTA_DB_PATH", "./conta.db")
+DB_PATH = os.getenv("CONTA_DB_PATH")
+if not DB_PATH:
+    raise RuntimeError(
+        "CONTA_DB_PATH no está definida. No hay una ruta por defecto para "
+        "evitar que un script (test, prueba manual, o comando) abra la base "
+        "de datos real sin querer. Defínela en .env (uso normal) o en el "
+        "entorno antes de importar este módulo (tests, scripts puntuales)."
+    )
 engine = create_engine(
     f"sqlite:///{DB_PATH}",
     connect_args={"check_same_thread": False},
