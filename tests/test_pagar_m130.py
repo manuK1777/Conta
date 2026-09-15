@@ -8,6 +8,7 @@ surfaces its three possible outcomes (stored / mismatch / already registered)
 the way a CLI should: exit codes, printed warnings, nothing written on abort.
 """
 
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -75,3 +76,22 @@ def test_pagar_m130_delegates_to_shared_service(db):
     assert result.exit_code != 0
     pago_q1_unchanged = _stored_pago(db, 2025, 1)
     assert pago_q1_unchanged is not None and pago_q1_unchanged.resultado == Decimal("200.00")
+
+
+def test_pagar_m130_success_message_shows_exactly_two_decimals(db):
+    """Regression: the success message used to print result.pago's
+    DB-refreshed Decimal directly (e.g. "30.0000000000 €") instead of the
+    quantized 2-decimal value -- cosmetic only, the stored value was always
+    correct, but the printed message wasn't."""
+    with Session(db) as s:
+        make_factura(s, numero="F1", fecha=date(2025, 1, 10), base_eur=Decimal("1000.00"))
+
+    computed = irpf_snapshot_acumulado(2025, 1)["resultado"]
+    assert computed == Decimal("200.00")
+
+    result = runner.invoke(app, ["pagar-m130", "2025Q1", "200.00"])
+    assert result.exit_code == 0, result.output
+
+    assert re.search(r"ingresado: 200\.00 €", result.output)
+    assert re.search(r"resultado: 200\.00 €", result.output)
+    assert "200.0000000000" not in result.output
