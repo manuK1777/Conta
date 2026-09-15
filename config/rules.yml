@@ -15,4 +15,6 @@ modelo130:
 
 redondeo:
   decimales_visualizacion: 2
-  decimales_calculo: 4
+  # No decimales_calculo key here on purpose -- see CLAUDE.md's "Money"
+  # section for why an intermediate rounding step was rejected rather than
+  # left unwired.

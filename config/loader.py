@@ -29,9 +29,17 @@ _raw = _load_raw()
 # DECIMALES_VISUALIZACION places, matching the scale of every literal they
 # replace exactly -- e.g. Decimal("21.00"), not Decimal("21.0"). Both compare
 # equal, but keeping the same scale avoids any incidental difference in
-# string formatting or stored representation.) ---
+# string formatting or stored representation.)
+#
+# There is deliberately no DECIMALES_CALCULO / intermediate-rounding constant
+# here. AEAT's own Modelo 130/303 forms round each casilla to 2 decimals
+# (round-half-up) before feeding the next -- there is no intermediate
+# higher-precision step in the official calculation, and introducing one can
+# diverge from AEAT's own result: quantizing to 4 decimals before the final
+# 2-decimal quantize changes the outcome for some inputs (proven directly,
+# e.g. 0.00495 rounds to 0.00 direct-to-2dp but 0.01 via a 4-decimal
+# intermediate step). See CLAUDE.md for the full record of this decision. ---
 DECIMALES_VISUALIZACION: int = int(_raw["redondeo"]["decimales_visualizacion"])
-DECIMALES_CALCULO: int = int(_raw["redondeo"]["decimales_calculo"])
 
 _VIS_QUANT = Decimal(1).scaleb(-DECIMALES_VISUALIZACION)
 
