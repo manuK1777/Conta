@@ -1,16 +1,11 @@
-"""Tests for pagar-m130's validation against irpf_snapshot_acumulado().
+"""Delegation test for cli.py's pagar-m130 command.
 
-Context: pagar_m130 used to trust a manually-typed --resultado at face value
-(defaulting to "0" if the flag was omitted), with nothing checking it against
-what the underlying invoices/expenses actually produce. This silently
-mis-recorded 2026Q2's PagoFraccionado130.resultado as 0.00 instead of -30.97 --
-harmless there only because both Q1 and Q2 were negative, so casilla-05's
-max(resultado, 0) zeroed them out either way. A future POSITIVE quarter
-mis-recorded the same way would corrupt the next quarter's real tax liability.
-
-pagar_m130 now computes the result itself via irpf_snapshot_acumulado() and
-only accepts a manual --resultado that either matches (within 1 cent) or is
-explicitly forced with --force.
+The full case matrix (omitted/matching/mismatched/forced resultado, exact-zero
+vs negative prior quarters) now lives in tests/test_m130_service.py against
+services/m130.py::registrar_pago_m130 directly. This file only confirms the
+CLI command correctly wires its arguments into that shared service and
+surfaces its three possible outcomes (stored / mismatch / already registered)
+the way a CLI should: exit codes, printed warnings, nothing written on abort.
 """
 
 from datetime import date
@@ -23,7 +18,7 @@ from conta.app.cli import app
 from conta.app.models import PagoFraccionado130
 from conta.app.services.irpf import irpf_snapshot_acumulado
 
-from .conftest import make_factura, make_gasto
+from .conftest import make_factura
 
 runner = CliRunner()
 
@@ -38,150 +33,45 @@ def _stored_pago(db, year: int, quarter: int) -> PagoFraccionado130 | None:
         ).first()
 
 
-def test_resultado_omitted_stores_live_computed_positive(db):
+def test_pagar_m130_delegates_to_shared_service(db):
     with Session(db) as s:
         make_factura(s, numero="F1", fecha=date(2025, 1, 10), base_eur=Decimal("1000.00"))
 
     computed = irpf_snapshot_acumulado(2025, 1)["resultado"]
-    assert computed == Decimal("200.00")  # sanity: 20% of 1000, no gastos/retenciones
+    assert computed == Decimal("200.00")
 
+    # --resultado omitted -> delegates to the service, which stores the
+    # live-computed value with no manual input at all.
     result = runner.invoke(app, ["pagar-m130", "2025Q1", "200.00"])
     assert result.exit_code == 0, result.output
-
     pago = _stored_pago(db, 2025, 1)
-    assert pago is not None
-    assert pago.resultado == computed == Decimal("200.00")
+    assert pago is not None and pago.resultado == Decimal("200.00")
 
-
-def test_resultado_omitted_stores_live_computed_negative(db):
+    # A mismatched --resultado without --force -> service returns
+    # ResultadoNoCoincide, CLI aborts (nonzero exit) and writes nothing, and
+    # both the computed and supplied values are printed in the warning.
     with Session(db) as s:
-        make_factura(
-            s, numero="F1", fecha=date(2025, 1, 10), base_eur=Decimal("100.00"),
-            ret_irpf_pct=Decimal("10.00"),
-        )
-        make_gasto(
-            s, proveedor="Gasto grande", fecha=date(2025, 1, 20),
-            base_eur=Decimal("2000.00"), cuota_iva=Decimal("420.00"), iva_deducible=True,
-        )
+        make_factura(s, numero="F2", fecha=date(2025, 4, 10), base_eur=Decimal("1000.00"))
+    computed_q2 = irpf_snapshot_acumulado(2025, 2)["resultado"]
+    assert computed_q2 == Decimal("200.00")
 
-    computed = irpf_snapshot_acumulado(2025, 1)["resultado"]
-    assert computed == Decimal("-10.00")  # sanity, matches test_irpf.py's casilla-05 case
-
-    result = runner.invoke(app, ["pagar-m130", "2025Q1", "0"])
-    assert result.exit_code == 0, result.output
-
-    pago = _stored_pago(db, 2025, 1)
-    assert pago is not None
-    assert pago.resultado == computed == Decimal("-10.00")
-
-
-def test_resultado_omitted_stores_live_computed_exact_zero(db):
-    """A genuine zero from real data (not a floored negative)."""
-    with Session(db) as s:
-        make_factura(
-            s, numero="F1", fecha=date(2025, 1, 10), base_eur=Decimal("1000.00"),
-            ret_irpf_pct=Decimal("20.00"),
-        )
-
-    computed = irpf_snapshot_acumulado(2025, 1)["resultado"]
-    assert computed == Decimal("0.00")  # base_20 (200.00) - retenciones (200.00) = 0
-
-    result = runner.invoke(app, ["pagar-m130", "2025Q1", "0"])
-    assert result.exit_code == 0, result.output
-    assert "difiere" not in result.output.lower()
-
-    pago = _stored_pago(db, 2025, 1)
-    assert pago is not None
-    assert pago.resultado == Decimal("0.00")
-
-
-def test_resultado_matching_within_one_cent_stores_without_force(db):
-    with Session(db) as s:
-        make_factura(s, numero="F1", fecha=date(2025, 1, 10), base_eur=Decimal("1000.00"))
-
-    computed = irpf_snapshot_acumulado(2025, 1)["resultado"]
-    assert computed == Decimal("200.00")
-
-    # Exactly at the 1-cent boundary -- must count as a match, no --force needed.
-    result = runner.invoke(app, ["pagar-m130", "2025Q1", "200.01", "--resultado", "200.01"])
-    assert result.exit_code == 0, result.output
-    assert "difiere" not in result.output.lower()
-
-    pago = _stored_pago(db, 2025, 1)
-    assert pago is not None
-    assert pago.resultado == Decimal("200.01")
-
-
-def test_resultado_mismatch_over_one_cent_without_force_aborts(db):
-    with Session(db) as s:
-        make_factura(s, numero="F1", fecha=date(2025, 1, 10), base_eur=Decimal("1000.00"))
-
-    computed = irpf_snapshot_acumulado(2025, 1)["resultado"]
-    assert computed == Decimal("200.00")
-
-    result = runner.invoke(app, ["pagar-m130", "2025Q1", "250.00", "--resultado", "250.00"])
+    result = runner.invoke(app, ["pagar-m130", "2025Q2", "999.00", "--resultado", "999.00"])
     assert result.exit_code != 0
-
-    # Both values must appear in the warning.
     assert "200.00" in result.output
-    assert "250.00" in result.output
+    assert "999.00" in result.output
+    assert _stored_pago(db, 2025, 2) is None
 
-    # Nothing must have been written.
-    assert _stored_pago(db, 2025, 1) is None
-
-
-def test_resultado_mismatch_over_one_cent_with_force_stores_supplied_value(db):
-    """Preserves the ability to deliberately record a real-world transcription
-    case like 2026Q2's 857.87-vs-857.84, visibly and on purpose."""
-    with Session(db) as s:
-        make_factura(s, numero="F1", fecha=date(2025, 1, 10), base_eur=Decimal("1000.00"))
-
-    computed = irpf_snapshot_acumulado(2025, 1)["resultado"]
-    assert computed == Decimal("200.00")
-
+    # Same mismatch, with --force -> service stores the supplied value.
     result = runner.invoke(
-        app, ["pagar-m130", "2025Q1", "250.00", "--resultado", "250.00", "--force"]
+        app, ["pagar-m130", "2025Q2", "999.00", "--resultado", "999.00", "--force"]
     )
     assert result.exit_code == 0, result.output
+    pago_q2 = _stored_pago(db, 2025, 2)
+    assert pago_q2 is not None and pago_q2.resultado == Decimal("999.00")
 
-    pago = _stored_pago(db, 2025, 1)
-    assert pago is not None
-    assert pago.resultado == Decimal("250.00")  # supplied value, not the computed 200.00
-
-
-def test_zero_and_negative_prior_quarter_feed_next_quarters_pagos_previos_identically(db):
-    """Casilla-05 semantics (max(resultado, 0)) must treat a stored 0.00 exactly
-    like a negative prior quarter -- same code path, same numeric outcome."""
-    # Year A: Q1 resultado is exactly 0.00 (genuine zero, not floored).
-    with Session(db) as s:
-        make_factura(
-            s, numero="A1", fecha=date(2025, 1, 10), base_eur=Decimal("1000.00"),
-            ret_irpf_pct=Decimal("20.00"),
-        )
-    assert irpf_snapshot_acumulado(2025, 1)["resultado"] == Decimal("0.00")
-    result = runner.invoke(app, ["pagar-m130", "2025Q1", "0"])
-    assert result.exit_code == 0, result.output
-
-    with Session(db) as s:
-        make_factura(s, numero="A2", fecha=date(2025, 5, 10), base_eur=Decimal("500.00"))
-    pagos_previos_after_zero = irpf_snapshot_acumulado(2025, 2)["pagos_previos"]
-
-    # Year B: Q1 resultado is negative.
-    with Session(db) as s:
-        make_factura(
-            s, numero="B1", fecha=date(2026, 1, 10), base_eur=Decimal("100.00"),
-            ret_irpf_pct=Decimal("10.00"),
-        )
-        make_gasto(
-            s, proveedor="Gasto grande", fecha=date(2026, 1, 20),
-            base_eur=Decimal("2000.00"), cuota_iva=Decimal("420.00"), iva_deducible=True,
-        )
-    assert irpf_snapshot_acumulado(2026, 1)["resultado"] == Decimal("-10.00")
-    result = runner.invoke(app, ["pagar-m130", "2026Q1", "0"])
-    assert result.exit_code == 0, result.output
-
-    with Session(db) as s:
-        make_factura(s, numero="B2", fecha=date(2026, 5, 10), base_eur=Decimal("500.00"))
-    pagos_previos_after_negative = irpf_snapshot_acumulado(2026, 2)["pagos_previos"]
-
-    assert pagos_previos_after_zero == pagos_previos_after_negative == Decimal("0.00")
+    # Already-registered period -> service returns PeriodoYaRegistrado, CLI
+    # aborts without recomputing or overwriting anything.
+    result = runner.invoke(app, ["pagar-m130", "2025Q1", "1.00"])
+    assert result.exit_code != 0
+    pago_q1_unchanged = _stored_pago(db, 2025, 1)
+    assert pago_q1_unchanged is not None and pago_q1_unchanged.resultado == Decimal("200.00")

@@ -6,6 +6,33 @@ conta.app.db.engine at a throwaway per-test SQLite file. The real conta.db is ne
 touched by this suite.
 """
 
+import os
+import tempfile
+
+# Session-wide safety net (2026-09-15 incident): an ad-hoc verification script
+# imported conta.app.tui.screens.m130 without applying the `db` fixture below,
+# and conta.app.db's module-level `engine` -- built at import time from
+# CONTA_DB_PATH/.env, falling back to "./conta.db" -- pointed straight at the
+# real production database. It wrote two garbage PagoFraccionado130 rows.
+#
+# This override runs before ANYTHING in this process imports conta.app.db --
+# conftest.py is always imported first by pytest, ahead of every test module
+# it collects -- so the first import of that module anywhere in this session
+# resolves its default engine to a harmless per-session throwaway file, no
+# matter what CONTA_DB_PATH or .env say. Every individual test additionally
+# gets its own fresh engine via the `db` fixture below; this is the outer net
+# for anything (a new test, a future probe) that forgets to request it.
+#
+# This protects everything invoked through pytest. It does NOT protect a
+# standalone script run directly with the interpreter, bypassing pytest and
+# this file entirely -- that was the actual mechanism of the 2026-09-15
+# incident, and the only real guard there is discipline: never import
+# conta.app.* from a throwaway script without setting CONTA_DB_PATH (or using
+# a pytest-based probe) first.
+os.environ["CONTA_DB_PATH"] = os.path.join(
+    tempfile.mkdtemp(prefix="conta-pytest-guard-"), "guard.db"
+)
+
 import json
 from datetime import date
 from decimal import Decimal
@@ -22,6 +49,12 @@ from conta.app.models import (
     PagoAutonomo,
     PagoFraccionado130,
 )
+
+
+@pytest.fixture
+def anyio_backend():
+    """Restrict anyio-marked async tests (Textual's App.run_test()) to asyncio."""
+    return "asyncio"
 
 
 @pytest.fixture
