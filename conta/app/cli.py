@@ -815,9 +815,11 @@ def pagar_m130(
         raise typer.Exit(1)
 
     assert isinstance(result, PagoRegistrado)
+    TWOPLACES = Decimal("0.01")
     typer.secho(
-        f"✔ Pago fraccionado 130 registrado: {periodo} → ingresado: {result.pago.importe} € "
-        f"| resultado: {result.pago.resultado} €",
+        f"✔ Pago fraccionado 130 registrado: {periodo} → "
+        f"ingresado: {result.pago.importe.quantize(TWOPLACES, rounding=ROUND_HALF_UP)} € "
+        f"| resultado: {result.pago.resultado.quantize(TWOPLACES, rounding=ROUND_HALF_UP)} €",
         fg=typer.colors.GREEN,
     )
 
