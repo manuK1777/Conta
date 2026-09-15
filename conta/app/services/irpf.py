@@ -10,8 +10,10 @@ from ..models import (
     Actividad,
 )
 from ..db import get_session
+from config import loader as _rules
 
 TWOPLACES = Decimal("0.01")
+_PORCENTAJE_PAGO_FRACCIONADO = _rules.MODELO130_PORCENTAJE_PAGO_FRACCIONADO / Decimal("100")
 
 
 def quarter_end(year: int, q: int) -> date:
@@ -88,7 +90,7 @@ def irpf_snapshot_acumulado(
     rendimiento = ingresos - total_gastos
 
     base_20 = (
-        (rendimiento * Decimal("0.20"))
+        (rendimiento * _PORCENTAJE_PAGO_FRACCIONADO)
         .quantize(TWOPLACES, rounding=ROUND_HALF_UP)
         if rendimiento > 0
         else Decimal("0.00")

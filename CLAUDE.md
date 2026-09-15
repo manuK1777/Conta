@@ -40,9 +40,12 @@ directly rather than relying on `make test`, since that target swallows failures
 - `.env` (see `.env.example`): `CONTA_DB_PATH` (default `./conta.db`), `CONTA_RULES_PATH`
   (default `./config/rules.yml`).
 - `config/rules.yml`: fiscal constants — IVA rates (general/reducido/superreducido),
-  IRPF retention % per `Actividad`, Modelo 130 pago fraccionado %, rounding precision.
-  Note: several of these values are currently hardcoded in `services/` rather than actually
-  read from this file — check before assuming a rule change here takes effect.
+  IRPF retention % per `Actividad`, Modelo 130 pago fraccionado %, display rounding
+  precision. Loaded once by `config/loader.py`, which every place that used to hardcode
+  these values (`models.py`, `schemas.py`, `cli.py`, `tui/screens/emite.py`,
+  `tui/screens/gasto_form.py`, `services/irpf.py`) now imports from — editing a rate here
+  takes effect everywhere. There is no intermediate-calculation-precision key; see the
+  Money section below.
 
 ## Architecture
 
@@ -96,6 +99,16 @@ across several CLI commands rather than factored into a shared helper.
 **Money:** All monetary fields are `Decimal`. Quantize to `Decimal("0.01")` with
 `ROUND_HALF_UP` at display/storage boundaries, matching the pattern already used throughout
 `services/` and `cli.py` — don't introduce float arithmetic for money.
+Rounding is per-casilla to 2 decimals, single-step, matching AEAT's own Modelo 130/303
+forms (each casilla rounds to 2 decimals before feeding the next — no intermediate
+higher-precision step in the official calculation). `config/rules.yml` deliberately has
+no "decimales_calculo" or similar intermediate-rounding key: one was considered and
+rejected, since quantizing to 4 decimals before the existing final 2-decimal quantize
+changes the result for some inputs (proven: 0.00495 rounds to 0.00 direct-to-2dp but
+0.01 via a 4-decimal intermediate step) — a real risk of diverging from AEAT's own
+result for percentage values outside the currently-used round ones (0/4/10/15/20/21/100),
+e.g. a non-standard `afecto_pct`. If a multi-precision rounding scheme is ever proposed
+again, this is why it was rejected before — re-derive the tradeoff, don't just re-add it.
 
 **TUI:** `tui/app.py` wires up `TabbedContent` with one `TabPane` per screen in
 `tui/screens/`. Switching to the Facturas tab (F2) auto-reloads its data

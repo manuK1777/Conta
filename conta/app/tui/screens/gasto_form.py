@@ -6,6 +6,7 @@ from textual.widgets import Button, Input, Label, Select, Static
 
 from ...db import get_session
 from ...models import GastoDeducible
+from config import loader as _rules
 
 
 def _parse_date(raw: str) -> date:
@@ -66,7 +67,7 @@ class GastoFormTab(Widget):
 
         with Widget(classes="form-row"):
             yield Label("Tipo IVA (%):")
-            yield Input("21.00", id="gf-tipo-iva", placeholder="21.00")
+            yield Input(str(_rules.IVA_GENERAL), id="gf-tipo-iva", placeholder="21.00")
 
         with Widget(classes="form-row"):
             yield Label("Cuota IVA (override):")
@@ -101,7 +102,7 @@ class GastoFormTab(Widget):
     def _clear(self) -> None:
         for fid in ["gf-proveedor", "gf-nif", "gf-fecha", "gf-base", "gf-cuota-iva", "gf-tipo"]:
             self.query_one(f"#{fid}", Input).value = ""
-        self.query_one("#gf-tipo-iva", Input).value = "21.00"
+        self.query_one("#gf-tipo-iva", Input).value = str(_rules.IVA_GENERAL)
         self.query_one("#gf-afecto", Input).value = "100.00"
         self.query_one("#gasto-status", Static).update("")
         self.query_one("#gasto-error", Static).update("")
@@ -135,7 +136,7 @@ class GastoFormTab(Widget):
                 raise ValueError(f"Base inválida: '{base_raw}'")
 
             try:
-                tipo_iva = Decimal(self._get("gf-tipo-iva") or "21.00")
+                tipo_iva = Decimal(self._get("gf-tipo-iva") or str(_rules.IVA_GENERAL))
             except InvalidOperation:
                 raise ValueError("Tipo IVA inválido")
 

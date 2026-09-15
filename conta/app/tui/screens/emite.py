@@ -14,6 +14,7 @@ from ...db import get_session
 from ...models import Actividad, FacturaEmitida
 from ...services.facturas import distinct_clientes, ultima_factura_cliente
 from ...services.factura_pdf import generar_factura_pdf, safe_numero_filename
+from config import loader as _rules
 
 
 def _abrir_pdf(path: Path) -> None:
@@ -129,11 +130,15 @@ class EmiteTab(Widget):
 
         with Widget(classes="form-row"):
             yield Label("Tipo IVA (%):")
-            yield Input("21.00", id="fe-tipo-iva", placeholder="21.00")
+            yield Input(str(_rules.IVA_GENERAL), id="fe-tipo-iva", placeholder="21.00")
 
         with Widget(classes="form-row"):
             yield Label("IRPF ret. (%):")
-            yield Input("15.00", id="fe-irpf", placeholder="0.00 o 15.00")
+            yield Input(
+                str(_rules.retencion_irpf(Actividad.musica)),
+                id="fe-irpf",
+                placeholder="0.00 o 15.00",
+            )
 
         with Widget(classes="form-row"):
             yield Label("Actividad:")
@@ -197,8 +202,8 @@ class EmiteTab(Widget):
         for fid in ["fe-numero", "fe-fecha", "fe-cliente", "fe-nif", "fe-notas"]:
             self.query_one(f"#{fid}", Input).value = ""
         self.query_one("#fe-base", Input).value = ""
-        self.query_one("#fe-tipo-iva", Input).value = "21.00"
-        self.query_one("#fe-irpf", Input).value = "15.00"
+        self.query_one("#fe-tipo-iva", Input).value = str(_rules.IVA_GENERAL)
+        self.query_one("#fe-irpf", Input).value = str(_rules.retencion_irpf(Actividad.musica))
         self.query_one("#fe-actividad").value = Actividad.musica.value
         self.query_one("#fe-cliente-direccion", TextArea).text = ""
         self.query_one("#fe-concepto", TextArea).text = ""
@@ -241,7 +246,7 @@ class EmiteTab(Widget):
                 raise ValueError(f"Base inválida: '{base_raw}'")
 
             try:
-                tipo_iva = Decimal(self._get("fe-tipo-iva") or "21.00")
+                tipo_iva = Decimal(self._get("fe-tipo-iva") or str(_rules.IVA_GENERAL))
             except InvalidOperation:
                 raise ValueError("Tipo IVA inválido")
 
