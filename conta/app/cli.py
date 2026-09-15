@@ -23,6 +23,7 @@ from .services.importacion_pdf.importador_factura import importar_factura_pdf
 from .services.emisor import get_emisor_config, set_emisor_config
 from .services.factura_pdf import generar_factura_pdf
 from .services.backup import crear_backup
+from config import loader as _rules
 
 
 
@@ -67,8 +68,8 @@ def add_factura(
     fecha: str,
     cliente_nombre: str,
     base: str,
-    tipo_iva: str = "21.00",
-    ret_irpf_pct: str = "15.00",
+    tipo_iva: str = str(_rules.IVA_GENERAL),
+    ret_irpf_pct: str = str(_rules.retencion_irpf(Actividad.musica)),
     actividad: Actividad = Actividad.musica,
     cliente_nif: str = typer.Option(None),
     cliente_direccion: str = typer.Option(None, help="Dirección del cliente para la factura PDF"),
@@ -164,7 +165,7 @@ def add_gasto(
     proveedor: str,
     fecha: str,
     base: str,
-    tipo_iva: str = "21.00",
+    tipo_iva: str = str(_rules.IVA_GENERAL),
     afecto_pct: str = "100.00",
     tipo: str = typer.Option(None),
     pdf: str = typer.Option(None, help="Ruta del PDF"),
@@ -193,9 +194,17 @@ def add_gasto(
         raise typer.Exit(code=1)
 
     # Validar tipo IVA estándar
-    if tipo_iva_dec not in (Decimal("0.00"), Decimal("4.00"), Decimal("10.00"), Decimal("21.00")):
+    tipos_iva_validos = (
+        Decimal("0.00"),
+        _rules.IVA_SUPERREDUCIDO,
+        _rules.IVA_REDUCIDO,
+        _rules.IVA_GENERAL,
+    )
+    if tipo_iva_dec not in tipos_iva_validos:
         typer.secho(
-            "Tipo IVA debe ser 0.00, 4.00, 10.00 o 21.00",
+            "Tipo IVA debe ser "
+            + ", ".join(str(v) for v in tipos_iva_validos[:-1])
+            + f" o {tipos_iva_validos[-1]}",
             fg=typer.colors.YELLOW,
         )
 

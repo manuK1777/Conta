@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field, field_validator   
+from pydantic import BaseModel, Field, field_validator
 from datetime import date
 from decimal import Decimal
 from .models import Actividad
+from config import loader as _rules
 
 
 class FacturaIn(BaseModel):
@@ -12,7 +13,7 @@ class FacturaIn(BaseModel):
     cliente_direccion: str | None = None
     pais: str | None = None
     base_eur: Decimal
-    tipo_iva: Decimal = Field(default=Decimal("21.00"))
+    tipo_iva: Decimal = Field(default=_rules.IVA_GENERAL)
     ret_irpf_pct: Decimal = Field(default=Decimal("0.00"))
     actividad: Actividad
     concepto: str | None = None
@@ -26,7 +27,7 @@ class GastoIn(BaseModel):
     proveedor_nif: str | None = None
     fecha: date
     base_eur: Decimal
-    tipo_iva: Decimal = Field(default=Decimal("21.00"))
+    tipo_iva: Decimal = Field(default=_rules.IVA_GENERAL)
     afecto_pct: Decimal = Field(default=Decimal("100.00"))
     tipo: str | None = None
     archivo_pdf_path: str | None = None
