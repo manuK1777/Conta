@@ -5,17 +5,26 @@ independently in models.py, schemas.py, cli.py, tui/screens/emite.py, and
 services/irpf.py (see the architecture audit that flagged rules.yml as
 effectively dead -- editing it had zero effect on the running app).
 
-CONTA_RULES_PATH follows the same convention as CONTA_DB_PATH: settable via
-.env, defaulting to ./config/rules.yml (the app is expected to run from the
-project root, per CLAUDE.md's documented setup).
+CONTA_RULES_PATH can override the location via .env, same as CONTA_DB_PATH,
+but normally shouldn't need to: the default is resolved relative to this
+file's own location, not the process's current working directory, so `conta`
+works correctly from any directory without it being set (fixed 2026-09-15 --
+see the "current working directory" comment below for what broke before).
 """
 
 import os
 from decimal import Decimal
+from pathlib import Path
 
 import yaml
 
-RULES_PATH = os.getenv("CONTA_RULES_PATH", "./config/rules.yml")
+# Default resolved relative to this file's own location, not the process's
+# current working directory -- "./config/rules.yml" only worked when conta
+# happened to be run from the repo root; the installed `conta` command run
+# from anywhere else crashed at import time (models.py imports this module
+# at module load). CONTA_RULES_PATH, if set, is used verbatim as before.
+_DEFAULT_RULES_PATH = Path(__file__).resolve().parent / "rules.yml"
+RULES_PATH = os.getenv("CONTA_RULES_PATH", str(_DEFAULT_RULES_PATH))
 
 
 def _load_raw() -> dict:
